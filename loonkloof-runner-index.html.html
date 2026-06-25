@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Equal Pay Run — De Loonkloof Runner</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#1A1A1A;font-family:'Space Grotesk',sans-serif;user-select:none}
+#wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#1A1A1A}
+canvas{display:block}
+#screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;z-index:10;padding:2rem;text-align:center}
+#screen h1{font-size:clamp(2rem,5vw,4rem);font-weight:900;color:#1A1A1A;text-transform:uppercase;letter-spacing:-2px;line-height:1;margin-bottom:0.75rem}
+#screen .sub{font-size:clamp(0.85rem,1.8vw,1.05rem);color:#333;max-width:520px;line-height:1.7;margin-bottom:1.75rem}
+#screen .sub strong{color:#CC0000}
+.btn{background:#CC0000;color:#fff;border:3px solid #1A1A1A;font-family:'Space Grotesk',sans-serif;font-size:clamp(0.85rem,1.5vw,1rem);font-weight:700;padding:12px 36px;cursor:pointer;text-transform:uppercase;letter-spacing:1px;margin-top:0.6rem;display:inline-block}
+.btn:hover{background:#1A1A1A}
+.btn.sec{background:#1A1A1A}.btn.sec:hover{background:#CC0000}
+#endTitle{font-size:clamp(1.1rem,2.5vw,1.6rem);font-weight:900;color:#CC0000;margin-bottom:0.7rem;line-height:1.3;max-width:520px}
+#endSub{font-size:clamp(0.8rem,1.5vw,0.95rem);color:#1A1A1A;line-height:1.6;margin-bottom:0.2rem;max-width:480px}
+#copyMsg{color:#CC0000;font-size:0.8rem;height:1rem;margin-top:0.3rem}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="screen">
+    <h1>Equal Pay Run</h1>
+    <p class="sub">
+      Elke dag werken vrouwen vanaf 15:24 gratis.<br>
+      Zij verdienen immers 20% minder dan mannen, wat voor een gemiddelde werkdag neerkomt op 1 uur en 36 minuten onbetaalde arbeid.<br><br>
+      Ontwijk de obstakels die vrouwen tegenkomen tijdens hun loopbaan.<br><br>
+      Loop door 3 levels op weg naar equal pay: <strong>carrière · gezin · cultuur</strong>.<br><br>
+      <strong>Laptop: ↑ springen &nbsp;·&nbsp; ↓ bukken</strong><br>
+      <strong>Gsm: swipe omhoog of omlaag</strong>
+    </p>
+    <button class="btn" id="startBtn">Start het spel</button>
+  </div>
+  <canvas id="c"></canvas>
+</div>
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const screen=document.getElementById('screen');
+document.getElementById('startBtn').addEventListener('click',startGame);
+
+const DPR = window.devicePixelRatio||1;
+const VW=1200,VH=500;
+canvas.width=VW*DPR; canvas.height=VH*DPR;
+canvas.style.width=VW+'px'; canvas.style.height=VH+'px';
+ctx.scale(DPR,DPR);
+
+function resize(){
+  const sx=window.innerWidth/VW,sy=window.innerHeight/VH,sc=Math.min(sx,sy);
+  canvas.style.width=Math.round(VW*sc)+'px'; canvas.style.height=Math.round(VH*sc)+'px';
+}
+resize(); window.addEventListener('resize',resize);
+
+const C={white:'#FFFFFF',red:'#CC0000',black:'#1A1A1A'};
+const HUD_H=52,GROUND=VH-72,AV_H_STAND=80,AV_H_DUCK=40,GRAVITY=0.62,JUMP_FORCE=-16.5;
+const MIN_OBS_GAP=520;
+const SPEED_START=4.2, SPEED_MAX=6.5;
+const RECHARGE_FRAMES=7*60; // 7 seconds at ~60fps
+
+const THEMES=[
+  {id:'carriere',label:'Carrière',bgColor:'#E8F0FA',groundColor:'#2C3E6B',markColor:'#5B80C8',buildColor:'#D0DEEF',buildStroke:'#8FA8D0',accentColor:'#2C3E6B'},
+  {id:'gezin',   label:'Gezin',   bgColor:'#FFF5E6',groundColor:'#7A3B10',markColor:'#C8804A',buildColor:'#FFE4C4',buildStroke:'#C8804A',accentColor:'#7A3B10'},
+  {id:'cultuur', label:'Cultuur', bgColor:'#F3E8F5',groundColor:'#5B2A6B',markColor:'#A865C0',buildColor:'#E8D5F0',buildStroke:'#A865C0',accentColor:'#5B2A6B'},
+];
+const TRANSITIONS=[
+  {px:10500,toTheme:1,label:'Gezin',color:'#7A3B10'},
+  {px:21000,toTheme:2,label:'Cultuur',color:'#5B2A6B'},
+];
+
+const MSGS=[
+  'Voor elke euro die een man verdient krijgt een vrouw 80 cent',
+  'Mensen praten liever over seks dan over hun loon.',
+  'Betrokken papa\u2019s dichten mee de loonkloof.',
+  'Vrouwen hebben 21 procent minder pensioen.',
+  'Eerlijke verdeling huishouden = eerlijke kansen op het werk.',
+  'Bedrijven met een goede balans tussen werk en privé boosten equal pay.',
+];
+
+function obsLabel(text,x,y){
+  ctx.font='bold 13px Space Grotesk,sans-serif';
+  const tw=ctx.measureText(text).width;
+  ctx.fillStyle='rgba(255,255,255,0.88)';
+  ctx.fillRect(x-tw/2-6,y-15,tw+12,20);
+  ctx.fillStyle=C.black;
+  ctx.textAlign='center';
+  ctx.fillText(text,x,y);
+  ctx.textAlign='left';
+}
+
+function obsBadge(action,x,y){
+  const txt=action==='jump'?'↑ SPRING':'↓ BUK';
+  const col=action==='jump'?'#1A1A1A':'#CC0000';
+  ctx.font='bold 12px Space Grotesk,sans-serif';
+  const tw=ctx.measureText(txt).width;
+  ctx.fillStyle=col;
+  ctx.fillRect(x-tw/2-8,y-16,tw+16,20);
+  ctx.fillStyle=C.white;
+  ctx.textAlign='center';
+  ctx.fillText(txt,x,y);
+  ctx.textAlign='left';
+}
+
+// ── OBSTACLE DEFINITIONS ──────────────────────────────────────────────────────
+const OBS_DEFS=[
+
+  // ── CARRIÈRE ──────────────────────────────────────────────────────────────
+
+  // Glazen plafond: ceiling — duck
+  {id:'glazenplafond',label:'Glazen plafond',action:'duck',theme:'carriere',
+   desc:'Vrouwen stromen veel minder door naar topfuncties. Slechts één op de drie managers is een vrouw.',
+   w:180,h:0,
+   draw(w,h){
+     const sh=32;
+     ctx.fillStyle='rgba(160,200,255,0.45)'; ctx.fillRect(0,0,w,sh);
+     ctx.strokeStyle='rgba(60,120,220,0.9)'; ctx.lineWidth=3; ctx.strokeRect(0,0,w,sh);
+     ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=2;
+     for(let i=0;i<w;i+=28){ctx.beginPath();ctx.moveTo(i,4);ctx.lineTo(i+18,sh-4);ctx.stroke();}
+     ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=1.5;
+     ctx.beginPath();ctx.moveTo(50,8);ctx.lineTo(66,2);ctx.lineTo(74,20);ctx.lineTo(60,28);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(w-60,5);ctx.lineTo(w-44,18);ctx.lineTo(w-55,28);ctx.stroke();
+     ctx.strokeStyle='#555'; ctx.lineWidth=2; ctx.setLineDash([5,4]);
+     ctx.beginPath();ctx.moveTo(18,0);ctx.lineTo(18,-28);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(w/2,0);ctx.lineTo(w/2,-28);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(w-18,0);ctx.lineTo(w-18,-28);ctx.stroke();
+     ctx.setLineDash([]);
+     ctx.fillStyle='rgba(30,30,120,0.85)'; ctx.font='bold 12px Space Grotesk,sans-serif'; ctx.textAlign='center';
+     ctx.fillText('Glazen plafond',w/2,sh+16); ctx.textAlign='left';
+   }},
+
+  // Sticky floor: tar puddle — jump
+  {id:'stickyfloor',label:'Sticky floor',action:'jump',theme:'carriere',
+   w:110,h:30,
+   desc:'Vrouwen hebben de helft minder kans dan mannen om uitgenodigd te worden op een sollicitatiegesprek voor een hogere functie dan de huidige functie.',
+   draw(w,h){
+     ctx.fillStyle='#1A1A1A';
+     ctx.beginPath();ctx.ellipse(w/2,h-6,w/2-2,16,0,0,Math.PI*2);ctx.fill();
+     ctx.fillStyle='#333';
+     for(let i=12;i<w-12;i+=22){
+       const bh=10+Math.sin(i)*6;
+       ctx.beginPath();ctx.ellipse(i,h-16-bh/2,9,bh/2+3,0,0,Math.PI*2);ctx.fill();
+     }
+     ctx.fillStyle=C.red;
+     for(let i=18;i<w-18;i+=28){
+       ctx.beginPath();ctx.ellipse(i,h-8,4,5,0,0,Math.PI*2);ctx.fill();
+     }
+     obsLabel('Sticky floor',w/2,-14);
+   }},
+
+  // Loontaboe: lips with shushing finger — duck
+  {id:'loontaboe',label:'Loontaboe',action:'duck',theme:'carriere',
+   w:150,h:0,
+   desc:'Praten over geld is moeilijk. Als je niet weet wat je collega\u2019s verdienen, is equal pay veraf.',
+   draw(w,h){
+     const sh=60, cx=w/2, cy=sh/2-2;
+     // suspension lines
+     ctx.strokeStyle='#555';ctx.lineWidth=2;ctx.setLineDash([4,4]);
+     ctx.beginPath();ctx.moveTo(cx-30,0);ctx.lineTo(cx-30,-22);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(cx+30,0);ctx.lineTo(cx+30,-22);ctx.stroke();
+     ctx.setLineDash([]);
+     // soft circular background
+     ctx.fillStyle='#FFF3E0';ctx.strokeStyle='#5D4037';ctx.lineWidth=2.5;
+     ctx.beginPath();ctx.arc(cx,cy,32,0,Math.PI*2);ctx.fill();ctx.stroke();
+     // lips (closed mouth)
+     ctx.fillStyle=C.red;ctx.strokeStyle='#5D4037';ctx.lineWidth=1.5;
+     ctx.beginPath();
+     ctx.moveTo(cx-18,cy+4);
+     ctx.bezierCurveTo(cx-12,cy-6, cx+12,cy-6, cx+18,cy+4);
+     ctx.bezierCurveTo(cx+12,cy+10, cx-12,cy+10, cx-18,cy+4);
+     ctx.closePath();ctx.fill();ctx.stroke();
+     ctx.beginPath();ctx.moveTo(cx-18,cy+4);ctx.lineTo(cx+18,cy+4);ctx.stroke();
+     // vertical index finger in front of the lips
+     ctx.fillStyle='#F5CBAA';ctx.strokeStyle='#5D4037';ctx.lineWidth=1.5;
+     ctx.beginPath();ctx.roundRect(cx-4,cy-22,8,28,4);ctx.fill();ctx.stroke();
+     ctx.fillStyle='#FBE9E7';
+     ctx.beginPath();ctx.ellipse(cx,cy-20,3,3,0,0,Math.PI*2);ctx.fill();
+     // "Shhh" text
+     ctx.fillStyle='#1A1A1A';ctx.font='italic bold 14px Space Grotesk,sans-serif';ctx.textAlign='left';
+     ctx.fillText('Shhh…',cx+30,cy-6);
+     ctx.fillStyle='#5D4037';ctx.font='bold 11px Space Grotesk,sans-serif';ctx.textAlign='center';
+     ctx.fillText('Loontaboe',cx,sh+14);ctx.textAlign='left';
+   }},
+
+  // Vrouwen- en mannenjobs: tilted balance scale — jump
+  {id:'genderjobs',label:'Vrouwen- en mannenjobs',action:'jump',theme:'carriere',
+   w:130,h:70,
+   desc:'Veel vrouwen werken in de zorg. Deze jobs betalen slechter dan jobs in tech, wetenschappen of de industrie (waar vooral mannen werken).',
+   draw(w,h){
+     const cx=w/2, baseY=h-4;
+     // stand
+     ctx.fillStyle='#5D4037';
+     ctx.fillRect(cx-14,baseY-6,28,6);
+     ctx.fillRect(cx-3,baseY-46,6,40);
+     // tilted beam (women side down)
+     const tilt=0.22;
+     ctx.save();
+     ctx.translate(cx,baseY-46);
+     ctx.rotate(tilt);
+     ctx.fillStyle='#8D6E63';
+     ctx.fillRect(-48,-3,96,6);
+     ctx.strokeStyle='#5D4037';ctx.lineWidth=2;
+     // left pan: small coin
+     ctx.beginPath();ctx.moveTo(-44,0);ctx.lineTo(-44,12);ctx.stroke();
+     ctx.fillStyle='#FFCDD2';
+     ctx.beginPath();ctx.ellipse(-44,16,16,5,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+     ctx.fillStyle='#FFD54F';
+     ctx.beginPath();ctx.arc(-44,12,5,0,Math.PI*2);ctx.fill();ctx.stroke();
+     ctx.fillStyle='#5D4037';ctx.font='bold 8px Space Grotesk,sans-serif';ctx.textAlign='center';
+     ctx.fillText('€',-44,15);
+     // right pan: big coin
+     ctx.beginPath();ctx.moveTo(44,0);ctx.lineTo(44,-12);ctx.stroke();
+     ctx.fillStyle='#BBDEFB';
+     ctx.beginPath();ctx.ellipse(44,-16,18,5,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+     ctx.fillStyle='#FFC107';
+     ctx.beginPath();ctx.arc(44,-22,10,0,Math.PI*2);ctx.fill();ctx.stroke();
+     ctx.fillStyle='#1A1A1A';ctx.font='bold 12px Space Grotesk,sans-serif';
+     ctx.fillText('€',44,-18);
+     ctx.restore();
+     // gender labels under each pan
+     ctx.fillStyle=C.red;ctx.font='bold 12px Space Grotesk,sans-serif';ctx.textAlign='center';
+     ctx.fillText('♀',cx-44,baseY-26);
+     ctx.fillStyle='#1565C0';
+     ctx.fillText('♂',cx+44,baseY-50);
+     ctx.textAlign='left';
+     obsLabel('Vrouwen- en mannenjobs',w/2,-12);
+   }},
+
+
+
+  // ── GEZIN ─────────────────────────────────────────────────────────────────
+
+  // Moederschapsstraf: 2 toddlers — jump
+  {id:'kinderen',label:'Moederschapsstraf',action:'jump',theme:'gezin',
+   w:100,h:80,
+   desc:'Werkgevers zien (potentiële) moeders liever niet komen. Zij worden gezien als minder ambitieus, minder flexibel en vaker afwezig.',
+   draw(w,h){
+      const drawKid=(cx,clr,skin)=>{
+        // Head
+        ctx.fillStyle=skin;
+        ctx.beginPath();ctx.arc(cx,h-54,13,0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle=C.black;ctx.lineWidth=1.5;ctx.stroke();
+        // Tiny tuft of hair
+        ctx.fillStyle=C.black;
+        ctx.beginPath();ctx.arc(cx,h-66,3,0,Math.PI*2);ctx.fill();
+        // Eyes
+        ctx.fillStyle=C.black;
+        ctx.beginPath();ctx.arc(cx-4,h-55,1.5,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.arc(cx+4,h-55,1.5,0,Math.PI*2);ctx.fill();
+        // Pacifier (tut): outer shield ring + teat sticking out
+        // shield (large flat ring)
+        ctx.fillStyle='#FF8A65';ctx.strokeStyle=C.black;ctx.lineWidth=1.4;
+        ctx.beginPath();ctx.ellipse(cx,h-46,9,6,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+        // central handle ring
+        ctx.fillStyle='#FFAB91';
+        ctx.beginPath();ctx.arc(cx,h-46,3,0,Math.PI*2);ctx.fill();ctx.stroke();
+        ctx.fillStyle='#FFFFFF';
+        ctx.beginPath();ctx.arc(cx,h-46,1.5,0,Math.PI*2);ctx.fill();
+        // teat poking up toward the mouth
+        ctx.fillStyle='#FFE0B2';
+        ctx.beginPath();ctx.ellipse(cx,h-51,3,3.5,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+        // Onesie body
+        ctx.fillStyle=clr;
+        ctx.beginPath();ctx.roundRect(cx-10,h-42,20,26,3);ctx.fill();
+        ctx.strokeStyle=C.black;ctx.lineWidth=1.5;ctx.stroke();
+        // Arms (skin)
+        ctx.strokeStyle=skin;ctx.lineWidth=4;ctx.lineCap='round';
+        ctx.beginPath();ctx.moveTo(cx+10,h-34);ctx.lineTo(cx+18,h-44);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(cx-10,h-34);ctx.lineTo(cx-16,h-42);ctx.stroke();
+        // Baby bottle in right hand
+        ctx.fillStyle='#FFFFFF';ctx.strokeStyle=C.black;ctx.lineWidth=1.4;
+        ctx.beginPath();ctx.roundRect(cx+15,h-52,8,12,2);ctx.fill();ctx.stroke();
+        ctx.fillStyle='#FFF8E1';
+        ctx.fillRect(cx+16,h-48,6,7);
+        ctx.fillStyle='#F5CBAA';
+        ctx.beginPath();ctx.ellipse(cx+19,h-53,3,2.5,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+        // Legs
+        ctx.strokeStyle=C.black;ctx.lineWidth=4;
+        ctx.beginPath();ctx.moveTo(cx-5,h-16);ctx.lineTo(cx-5,h);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(cx+5,h-16);ctx.lineTo(cx+5,h);ctx.stroke();
+      };
+      drawKid(28,'#FFE082','#F5CBAA');
+      drawKid(72,'#A5D6A7','#5D3A1F');
+     obsLabel('Moederschapsstraf',w/2,-12);
+   }},
+
+  // Zorgtaken: washing line — duck
+  {id:'zorgtaken',label:'Zorgtaken',action:'duck',theme:'gezin',
+   w:200,h:0,
+   desc:'Vrouwen werken 8 uur per week meer in het huishouden en zijn 1,5 uur langer bezig met de kinderen in vergelijking met mannen.',
+   draw(w,h){
+     const sh=50;
+     ctx.strokeStyle='#8D6E63'; ctx.lineWidth=3;
+     ctx.beginPath();
+     ctx.moveTo(0,8);
+     ctx.bezierCurveTo(w*0.25,14, w*0.75,14, w,8);
+     ctx.stroke();
+     const items=[
+       {x:16, col:'#EF9A9A', w2:22},
+       {x:52, col:'#90CAF9', w2:18},
+       {x:84, col:'#A5D6A7', w2:24},
+       {x:120,col:'#FFF176', w2:20},
+       {x:152,col:'#CE93D8', w2:22},
+       {x:184,col:'#FFAB91', w2:18},
+     ];
+     for(const it of items){
+       ctx.fillStyle='#795548'; ctx.fillRect(it.x-3,6,6,10);
+       const cy=10;
+       ctx.fillStyle=it.col;
+       ctx.beginPath();
+       ctx.moveTo(it.x-it.w2/2,cy+6);
+       ctx.lineTo(it.x-it.w2/2-8,cy+2);
+       ctx.lineTo(it.x-it.w2/2-5,cy+14);
+       ctx.lineTo(it.x-it.w2/2,cy+12);
+       ctx.lineTo(it.x-it.w2/2,cy+sh-10);
+       ctx.lineTo(it.x+it.w2/2,cy+sh-10);
+       ctx.lineTo(it.x+it.w2/2,cy+12);
+       ctx.lineTo(it.x+it.w2/2+5,cy+14);
+       ctx.lineTo(it.x+it.w2/2+8,cy+2);
+       ctx.lineTo(it.x+it.w2/2,cy+6);
+       ctx.closePath(); ctx.fill();
+       ctx.strokeStyle='rgba(0,0,0,0.2)'; ctx.lineWidth=1; ctx.stroke();
+     }
+     ctx.strokeStyle='#795548'; ctx.lineWidth=2; ctx.setLineDash([5,4]);
+     ctx.beginPath();ctx.moveTo(6,8);ctx.lineTo(6,-22);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(w-6,8);ctx.lineTo(w-6,-22);ctx.stroke();
+     ctx.setLineDash([]);
+     ctx.fillStyle='#4E342E'; ctx.font='bold 11px Space Grotesk,sans-serif'; ctx.textAlign='center';
+     ctx.fillText('Zorgtaken',w/2,sh+16); ctx.textAlign='left';
+   }},
+
+  // Kinderopvang: closed daycare — jump
+  {id:'kinderopvang',label:'Geen kinderopvang',action:'jump',theme:'gezin',
+   w:80,h:90,
+   desc:'Geen plaats in de crèche of te dure opvang houdt vooral vrouwen thuis.',
+   draw(w,h){
+     ctx.fillStyle='#EF9A9A';ctx.fillRect(4,h-72,w-8,72);
+     ctx.strokeStyle='#C62828';ctx.lineWidth=2.5;ctx.strokeRect(4,h-72,w-8,72);
+     ctx.fillStyle='#C62828';
+     ctx.beginPath();ctx.moveTo(0,h-72);ctx.lineTo(w/2,h-90);ctx.lineTo(w,h-72);ctx.closePath();ctx.fill();
+     ctx.strokeStyle='#B71C1C';ctx.lineWidth=2;ctx.stroke();
+     ctx.fillStyle='#FFCCBC';
+     ctx.fillRect(10,h-62,18,16);ctx.strokeStyle='#C62828';ctx.lineWidth=1;ctx.strokeRect(10,h-62,18,16);
+     ctx.fillRect(w-28,h-62,18,16);ctx.strokeRect(w-28,h-62,18,16);
+     ctx.fillStyle='#EF5350';ctx.fillRect(w/2-10,h-36,20,36);
+     ctx.strokeStyle='#C62828';ctx.lineWidth=1.5;ctx.strokeRect(w/2-10,h-36,20,36);
+     ctx.strokeStyle='#B71C1C'; ctx.lineWidth=7; ctx.lineCap='round';
+     ctx.beginPath();ctx.moveTo(8,h-70);ctx.lineTo(w-8,h-4);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(w-8,h-70);ctx.lineTo(8,h-4);ctx.stroke();
+     obsLabel('Geen kinderopvang',w/2,-8);
+   }},
+
+  // Deeltijds werk signpost — jump
+  {id:'parttime',label:'Deeltijds werk',action:'jump',theme:'gezin',
+   w:110,h:78,
+   desc:'Bijna de helft van de vrouwen werkt deeltijds, tegenover één op de tien mannen. Dat doen ze vooral om voor kinderen of andere personen te zorgen. Ook zorgverloven worden hoofdzakelijk door vrouwen opgenomen.',
+   draw(w,h){
+     // Pole
+     ctx.fillStyle='#8D6E63';ctx.fillRect(w/2-5,0,10,h);
+     ctx.strokeStyle='#5D4037';ctx.lineWidth=2;ctx.strokeRect(w/2-5,0,10,h);
+     // Sign board
+     const sx=8,sy=4,sw=w-16,sh=34;
+     ctx.fillStyle='#FFF9C4';ctx.fillRect(sx,sy,sw,sh);
+     ctx.strokeStyle='#5D4037';ctx.lineWidth=2.5;ctx.strokeRect(sx,sy,sw,sh);
+     ctx.strokeStyle='#FBC02D';ctx.lineWidth=1;
+     ctx.strokeRect(sx+4,sy+4,sw-8,sh-8);
+     ctx.fillStyle='#1A1A1A';ctx.font='bold 13px Space Grotesk,sans-serif';ctx.textAlign='center';
+     ctx.fillText('Deeltijds',w/2,sy+18);
+     ctx.fillText('werk',w/2,sy+32);
+     ctx.textAlign='left';
+   }},
+
+
+
+  // ── CULTUUR ───────────────────────────────────────────────────────────────
+
+  // Discriminatie — jump
+  {id:'discriminatie',label:'Discriminatie',action:'jump',theme:'cultuur',
+   w:76,h:86,
+   desc:'De helft van de loonkloof kan niet verklaard worden. Hier speelt wellicht pure discriminatie.',
+   draw(w,h){
+     const rows=5,bw=24,bh=14;
+     for(let r=0;r<rows;r++){
+       const offset=r%2===0?0:12;
+       for(let c=-1;c<4;c++){
+         const bx=c*bw+offset,by=h-rows*bh+r*bh;
+         ctx.fillStyle=r%2===0?'#D32F2F':'#C62828';
+         ctx.fillRect(bx+1,by+1,bw-2,bh-2);
+         ctx.strokeStyle='#7B0000';ctx.lineWidth=1;ctx.strokeRect(bx+1,by+1,bw-2,bh-2);
+       }
+     }
+     ctx.fillStyle='#FF5252';
+     ctx.beginPath();ctx.arc(w/2,h-rows*bh-22,22,0,Math.PI*2);ctx.fill();
+     ctx.strokeStyle=C.white;ctx.lineWidth=3;ctx.stroke();
+     ctx.strokeStyle=C.white;ctx.lineWidth=3;
+     ctx.beginPath();ctx.arc(w/2,h-rows*bh-30,9,0,Math.PI*2);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(w/2,h-rows*bh-21);ctx.lineTo(w/2,h-rows*bh-9);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(w/2-7,h-rows*bh-16);ctx.lineTo(w/2+7,h-rows*bh-16);ctx.stroke();
+     ctx.strokeStyle=C.white;ctx.lineWidth=4;ctx.lineCap='round';
+     ctx.beginPath();ctx.moveTo(w/2-16,h-rows*bh-38);ctx.lineTo(w/2+16,h-rows*bh-6);ctx.stroke();
+     obsLabel('Discriminatie',w/2,-6);
+   }},
+
+  // Microagressie — duck
+  {id:'microagressie',label:'Microagressie',action:'duck',theme:'cultuur',
+   w:230,h:0,
+   desc:'Microagressies zijn subtiele opmerkingen of gedragingen die mensen op basis van gender (of andere kenmerken) kleineren of uitsluiten.',
+   draw(w,h){
+     const sh=62;
+     // Suspension lines
+     ctx.strokeStyle='#555';ctx.lineWidth=2;ctx.setLineDash([4,4]);
+     ctx.beginPath();ctx.moveTo(20,0);ctx.lineTo(20,-20);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(w-20,0);ctx.lineTo(w-20,-20);ctx.stroke();
+     ctx.setLineDash([]);
+     // Speech bubble body
+     ctx.fillStyle='#F3E5F5';ctx.strokeStyle='#7B1FA2';ctx.lineWidth=2;
+     const bx=8,by=6,bw=w-16,bh=sh-14,tailW=18,tailH=12;
+     ctx.beginPath();
+     ctx.moveTo(bx+16,by);
+     ctx.lineTo(bx+bw-16,by);
+     ctx.quadraticCurveTo(bx+bw,by,bx+bw,by+16);
+     ctx.lineTo(bx+bw,by+bh-16);
+     ctx.quadraticCurveTo(bx+bw,by+bh,bx+bw-16,by+bh);
+     ctx.lineTo(bx+bw/2+tailW/2,by+bh);
+     ctx.lineTo(bx+bw/2,by+bh+tailH);
+     ctx.lineTo(bx+bw/2-tailW/2,by+bh);
+     ctx.lineTo(bx+16,by+bh);
+     ctx.quadraticCurveTo(bx,by+bh,bx,by+bh-16);
+     ctx.lineTo(bx,by+16);
+     ctx.quadraticCurveTo(bx,by,bx+16,by);
+     ctx.closePath();ctx.fill();ctx.stroke();
+      // Inner text — cycle through concrete microaggressions
+      const phrases=[
+        ['"Is het weer die tijd','van de maand?"'],
+        ['"Kan je vrouw de kinderen','niet ophalen?"'],
+        ['"Je bent mooier','als je lacht."'],
+        ['"Heb jij een','kinderwens?"']
+      ];
+      const idx=Math.floor(frame/150)%phrases.length;
+      const lines=phrases[idx];
+      ctx.fillStyle='#4A148C';ctx.font='bold 11px Space Grotesk,sans-serif';ctx.textAlign='center';
+      const cy=by+bh/2;
+      ctx.fillText(lines[0],w/2,cy-2);
+      ctx.fillText(lines[1],w/2,cy+12);
+      ctx.textAlign='left';
+
+   }},
+
+  // Good old boys network — jump
+  {id:'gobn_cultuur',label:'Old boys network',action:'jump',theme:'cultuur',
+   w:110,h:86,
+   desc:'Mannen delen belangrijke informatie over jobs, promoties en lonen onderling, op momenten en plaatsen waar vrouwen vaak niet bij zijn.',
+   draw(w,h){
+     ctx.fillStyle='#4A148C'; ctx.fillRect(0,h-20,w,20);
+     ctx.strokeStyle='#311B92'; ctx.lineWidth=2; ctx.strokeRect(0,h-20,w,20);
+     ctx.fillStyle='#CE93D8'; ctx.font='bold 9px Space Grotesk,sans-serif'; ctx.textAlign='center';
+     ctx.fillText('GESLOTEN NETWERK',w/2,h-7);
+     const drawSuit=(sx,hh)=>{
+       ctx.fillStyle='#F5CBAA'; ctx.beginPath();ctx.arc(sx,hh-66,11,0,Math.PI*2);ctx.fill();
+       ctx.strokeStyle='#333';ctx.lineWidth=1.5;ctx.stroke();
+       ctx.fillStyle='#444'; ctx.beginPath();ctx.ellipse(sx,hh-74,11,7,0,0,Math.PI*2);ctx.fill();
+       ctx.fillStyle='#1A1A2E'; ctx.beginPath();
+       ctx.moveTo(sx-14,hh-55);ctx.lineTo(sx-14,hh-20);ctx.lineTo(sx+14,hh-20);ctx.lineTo(sx+14,hh-55);ctx.closePath();ctx.fill();
+       ctx.strokeStyle='#333';ctx.lineWidth=1;ctx.stroke();
+       ctx.fillStyle='#C8A000';
+       ctx.beginPath();ctx.moveTo(sx-3,hh-54);ctx.lineTo(sx,hh-36);ctx.lineTo(sx+3,hh-54);ctx.closePath();ctx.fill();
+       ctx.strokeStyle='#F5CBAA';ctx.lineWidth=4;ctx.lineCap='round';
+       ctx.beginPath();ctx.moveTo(sx+14,hh-44);ctx.lineTo(sx+22,hh-40);ctx.stroke();
+     };
+     drawSuit(24,h); drawSuit(55,h); drawSuit(86,h);
+     ctx.strokeStyle='#C8A000';ctx.lineWidth=2;
+     ctx.beginPath();ctx.moveTo(46,h-40);ctx.lineTo(57,h-40);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(77,h-40);ctx.lineTo(88,h-40);ctx.stroke();
+     obsLabel('Old boys network',w/2,-12);
+   }},
+
+  // Work-family conflict — jump
+  {id:'workfamily_cultuur',label:'Work-family conflict',action:'jump',theme:'cultuur',
+   w:100,h:84,
+   desc:'In veel sectoren worden werknemers beloond voor overuren en permanente beschikbaarheid, maar vrouwen kunnen hier minder aan voldoen door hun grotere aandeel in het huishouden.',
+   draw(w,h){
+     ctx.fillStyle='#FF8A65';
+     ctx.beginPath();ctx.moveTo(2,h-46);ctx.lineTo(36,h-70);ctx.lineTo(70,h-46);ctx.closePath();ctx.fill();
+     ctx.strokeStyle='#BF360C';ctx.lineWidth=2;ctx.stroke();
+     ctx.fillStyle='#FFCCBC';ctx.fillRect(12,h-46,46,46);
+     ctx.strokeStyle='#BF360C';ctx.lineWidth=1.5;ctx.strokeRect(12,h-46,46,46);
+     ctx.fillStyle='#FF8A65';ctx.fillRect(28,h-22,14,22);ctx.strokeStyle='#BF360C';ctx.strokeRect(28,h-22,14,22);
+     ctx.fillStyle='#FFCCBC';ctx.fillRect(16,h-40,10,10);ctx.fillRect(32,h-40,10,10);
+     ctx.fillStyle='#78909C';ctx.fillRect(w-58,h-64,50,64);
+     ctx.strokeStyle='#37474F';ctx.lineWidth=2;ctx.strokeRect(w-58,h-64,50,64);
+     for(let r=0;r<3;r++)for(let cc=0;cc<2;cc++){
+       ctx.fillStyle='#B0BEC5';ctx.fillRect(w-54+cc*20,h-58+r*18,14,12);
+     }
+     ctx.fillStyle='#F5CBAA';ctx.beginPath();ctx.arc(w/2,h-60,9,0,Math.PI*2);ctx.fill();
+     ctx.strokeStyle='#333';ctx.lineWidth=1.5;ctx.stroke();
+     ctx.fillStyle=C.red;ctx.fillRect(w/2-7,h-51,14,22);
+     ctx.strokeStyle='#333';ctx.lineWidth=1.5;ctx.strokeRect(w/2-7,h-51,14,22);
+     ctx.strokeStyle='#F5CBAA';ctx.lineWidth=4;ctx.lineCap='round';
+     ctx.beginPath();ctx.moveTo(w/2-7,h-44);ctx.lineTo(w/2-22,h-40);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(w/2+7,h-44);ctx.lineTo(w/2+22,h-40);ctx.stroke();
+     ctx.strokeStyle=C.red;ctx.lineWidth=2;ctx.lineCap='round';
+     ctx.beginPath();ctx.moveTo(w/2-28,h-40);ctx.lineTo(w/2-40,h-40);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(w/2-36,h-44);ctx.lineTo(w/2-44,h-40);ctx.lineTo(w/2-36,h-36);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(w/2+28,h-40);ctx.lineTo(w/2+40,h-40);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(w/2+36,h-44);ctx.lineTo(w/2+44,h-40);ctx.lineTo(w/2+36,h-36);ctx.stroke();
+     obsLabel('Work-family conflict',w/2,-12);
+   }},
+
+];
+
+// ── AVATAR ────────────────────────────────────────────────────────────────────
+const av={x:160,y:GROUND,vy:0,jumping:false,ducking:false,hit:false,hitTimer:0,legPhase:0,downed:false};
+function avH(){return av.ducking?AV_H_DUCK:AV_H_STAND;}
+
+let gameState='idle',frame=0,speed=SPEED_START,lives=3,won=false;
+let clockAngle=0,clockShake=0,clockTick=0,msgIndex=0;
+let distancePx=0,currentThemeIdx=0,transitionBanner=null;
+let obstacles=[],billboards=[],bgB=[],fgB=[],gMarks=[],stars=[];
+let prisonX=99999,prisonVisible=false;
+
+// recharge state
+let rechargeTimer=0, rechargeFactTitle='', rechargeFactText='';
+let invulnTimer=0; // brief invulnerability after recharge
+
+function getTheme(){return THEMES[currentThemeIdx];}
+
+function initBg(){
+  bgB=[];for(let i=0;i<14;i++)bgB.push({x:i*180+Math.random()*60,w:60+Math.random()*80,h:80+Math.random()*110});
+  fgB=[];for(let i=0;i<10;i++)fgB.push({x:i*200+Math.random()*80,w:80+Math.random()*100,h:100+Math.random()*130,win:Math.random()>0.3});
+  gMarks=[];for(let i=0;i<30;i++)gMarks.push({x:i*120});
+  billboards=[];
+  const billSpacing=1400;
+  for(let i=0;i<8;i++)billboards.push({x:600+i*billSpacing,msg:MSGS[i%MSGS.length],w:260,h:78});
+  obstacles=[];stars=[];
+  distancePx=0;currentThemeIdx=0;transitionBanner=null;
+}
+
+// avoid spawning the same obstacle twice in a row for better variety
+let lastObsId=null;
+function trySpawnObstacle(){
+  const rightmost=obstacles.length?Math.max(...obstacles.map(o=>o.x+o.w)):0;
+  if(rightmost>VW-MIN_OBS_GAP)return;
+  const theme=getTheme();
+  let pool=OBS_DEFS.filter(d=>d.theme===theme.id);
+  if(pool.length>1 && lastObsId){
+    const filtered=pool.filter(d=>d.id!==lastObsId);
+    if(filtered.length) pool=filtered;
+  }
+  const def=pool[Math.floor(Math.random()*pool.length)];
+  lastObsId=def.id;
+  const obsH=def.action==='jump'?def.h:GROUND-HUD_H-AV_H_DUCK-22;
+  obstacles.push({
+    defId:def.id,action:def.action,
+    x:VW+60,y:def.action==='jump'?GROUND-def.h:HUD_H+6,
+    w:def.w,h:obsH,active:true,
+  });
+}
+
+function spawnStar(){
+  stars.push({x:VW+10,y:HUD_H+20+Math.random()*(GROUND-HUD_H-100),r:2+Math.random()*3,vy:(Math.random()-0.5)*0.4});
+}
+
+// Controls
+function jump(){if(gameState!=='playing')return;if(!av.jumping&&!av.ducking){av.vy=JUMP_FORCE;av.jumping=true;clockTick=12;}}
+function duck(on){if(gameState!=='playing')return;av.ducking=on;}
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'||e.code==='ArrowUp'){e.preventDefault();jump();}
+  if(e.code==='ArrowDown'){e.preventDefault();duck(true);}
+});
+document.addEventListener('keyup',e=>{if(e.code==='ArrowDown')duck(false);});
+let ty=0;
+canvas.addEventListener('touchstart',e=>{ty=e.touches[0].clientY;},{passive:true});
+canvas.addEventListener('touchend',e=>{
+  const dy=ty-e.changedTouches[0].clientY;
+  if(dy>30)jump();else if(dy<-30){duck(true);setTimeout(()=>duck(false),460);}else jump();
+},{passive:true});
+
+let running=false;
+function startGame(){
+  screen.style.display='none';gameState='playing';frame=0;speed=SPEED_START;lives=3;won=false;
+  clockAngle=0;clockShake=0;clockTick=0;msgIndex=0;
+  av.x=160;av.y=GROUND;av.vy=0;av.jumping=false;av.ducking=false;av.hit=false;av.hitTimer=0;av.legPhase=0;av.downed=false;
+  prisonX=VW+30000;prisonVisible=false;
+  rechargeTimer=0;rechargeFactTitle='';rechargeFactText='';invulnTimer=0;lastObsId=null;
+  initBg();
+  if(!running)loop();
+}
+
+function collides(o){
+  const ah=avH();
+  const ax=av.x-13,ay=av.y-ah+8,aw=26,avhh=ah-14;
+  const ox=o.x+4,oy=o.y+4,ow=o.w-8,oh=o.h-6;
+  return ax<ox+ow&&ax+aw>ox&&ay<oy+oh&&ay+avhh>oy;
+}
+
+function triggerHit(o){
+  const def=OBS_DEFS.find(d=>d.id===o.defId);
+  lives--;
+  o.active=false;
+  if(lives<=0){gameState='end';won=false;showEnd();return;}
+  // Knock down avatar and start recharge
+  av.downed=true; av.ducking=false; av.jumping=false; av.vy=0; av.y=GROUND;
+  av.hit=true; av.hitTimer=30;
+  rechargeTimer=RECHARGE_FRAMES;
+  rechargeFactTitle=def?def.label:'Wist je dat?';
+  rechargeFactText=def?def.desc:'';
+  gameState='recharging';
+  // remove all currently-visible obstacles so the player has a clean restart
+  obstacles=[];
+}
+
+function update(){
+  if(gameState==='recharging'){
+    rechargeTimer--;
+    clockShake=Math.max(0,clockShake-0.5);
+    if(rechargeTimer<=0){
+      gameState='playing';
+      av.downed=false;
+      av.hit=false;
+      invulnTimer=90; // ~1.5s
+    }
+    return;
+  }
+  if(gameState!=='playing')return;
+  frame++;
+  distancePx+=speed;
+  if(frame>1800)speed=Math.min(SPEED_MAX,SPEED_START+(frame-1800)/5000*(SPEED_MAX-SPEED_START));
+  av.legPhase+=av.jumping?0.09:0.24;
+  if(av.jumping||av.y<GROUND){av.vy+=GRAVITY;av.y+=av.vy;if(av.y>=GROUND){av.y=GROUND;av.jumping=false;av.vy=0;}}
+  if(invulnTimer>0)invulnTimer--;
+  if(av.hit){av.hitTimer--;if(av.hitTimer<=0)av.hit=false;clockShake=8;clockAngle-=0.05;}
+  else clockShake=Math.max(0,clockShake-0.7);
+  if(clockTick>0){clockAngle+=0.04;clockTick--;}
+  if(frame%140===0)trySpawnObstacle();
+  if(frame%280===0)spawnStar();
+
+  for(const tr of TRANSITIONS){
+    if(distancePx>=tr.px&&distancePx<tr.px+speed*2&&currentThemeIdx<tr.toTheme){
+      currentThemeIdx=tr.toTheme;
+      transitionBanner={label:tr.label,color:tr.color,timer:180};
+      obstacles=[];
+    }
+  }
+  if(transitionBanner){transitionBanner.timer--;if(transitionBanner.timer<=0)transitionBanner=null;}
+
+  for(let o of obstacles){
+    o.x-=speed;
+    if(invulnTimer<=0 && !av.hit && collides(o)){
+      triggerHit(o);
+      return;
+    }
+  }
+  obstacles=obstacles.filter(o=>o.active&&o.x>-400);
+
+  for(let b of billboards){
+    b.x-=speed*0.55;
+    if(b.x<-320){
+      const maxX=Math.max(...billboards.filter(bb=>bb!==b).map(bb=>bb.x));
+      b.x=Math.max(VW+400, maxX+1400);
+      b.msg=MSGS[msgIndex++%MSGS.length];
+    }
+  }
+
+  for(let b of bgB){b.x-=speed*0.22;if(b.x<-220)b.x=VW+Math.random()*100;}
+  for(let b of fgB){b.x-=speed*0.48;if(b.x<-240)b.x=VW+Math.random()*120;}
+  for(let m of gMarks){m.x-=speed;if(m.x<-130)m.x+=3650;}
+  for(let s of stars){s.x-=speed*0.1;s.y+=s.vy;if(s.x<-10)s.x=VW+10;}
+  prisonX-=speed;
+  if(prisonX<VW+360)prisonVisible=true;
+  if(prisonX<av.x+18&&prisonVisible){won=true;gameState='end';showEnd();}
+}
+
+// ── DRAW HELPERS ─────────────────────────────────────────────────────────────
+function drawClock(){
+  const cx=VW-70,cy=HUD_H/2,r=18;
+  ctx.save();ctx.translate(cx+(Math.random()-0.5)*clockShake*0.35,cy+(Math.random()-0.5)*clockShake*0.2);
+  ctx.fillStyle=C.white;ctx.strokeStyle=C.black;ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();ctx.stroke();
+  for(let i=0;i<12;i++){
+    const a=(i/12)*Math.PI*2-Math.PI/2;
+    ctx.beginPath();ctx.moveTo(Math.cos(a)*r*0.78,Math.sin(a)*r*0.78);ctx.lineTo(Math.cos(a)*r*0.94,Math.sin(a)*r*0.94);
+    ctx.strokeStyle=C.black;ctx.lineWidth=i%3===0?2.5:1.2;ctx.stroke();
+  }
+  const bH=(15/12)*Math.PI*2-Math.PI/2,bM=(24/60)*Math.PI*2-Math.PI/2;
+  ctx.lineCap='round';
+  ctx.strokeStyle=C.black;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(bH+clockAngle*0.1)*r*0.55,Math.sin(bH+clockAngle*0.1)*r*0.55);ctx.stroke();
+  ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(bM+clockAngle)*r*0.74,Math.sin(bM+clockAngle)*r*0.74);ctx.stroke();
+  ctx.fillStyle=C.red;ctx.beginPath();ctx.arc(0,0,3,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+}
+
+function drawSmallClock(cx,cy,alive){
+  const r=12;
+  ctx.save();ctx.translate(cx,cy);
+  ctx.fillStyle=alive?C.white:'#E5E5E5';
+  ctx.strokeStyle=alive?C.black:'#BBBBBB';
+  ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();ctx.stroke();
+  if(alive){
+    for(let i=0;i<12;i++){
+      const a=(i/12)*Math.PI*2-Math.PI/2;
+      ctx.beginPath();ctx.moveTo(Math.cos(a)*r*0.78,Math.sin(a)*r*0.78);ctx.lineTo(Math.cos(a)*r*0.92,Math.sin(a)*r*0.92);
+      ctx.strokeStyle=C.black;ctx.lineWidth=i%3===0?1.8:1;ctx.stroke();
+    }
+    ctx.strokeStyle=C.black;ctx.lineWidth=2;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos((15/12)*Math.PI*2-Math.PI/2)*r*0.45,Math.sin((15/12)*Math.PI*2-Math.PI/2)*r*0.45);ctx.stroke();
+    ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos((24/60)*Math.PI*2-Math.PI/2)*r*0.6,Math.sin((24/60)*Math.PI*2-Math.PI/2)*r*0.6);ctx.stroke();
+    ctx.fillStyle=C.red;ctx.beginPath();ctx.arc(0,0,2,0,Math.PI*2);ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawDownedAvatar(){
+  // Avatar lying on the ground, recharging
+  ctx.save();ctx.translate(av.x,av.y);
+  // body laid horizontally
+  ctx.fillStyle=C.red;
+  ctx.beginPath();ctx.ellipse(0,-12,34,12,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle=C.black;ctx.lineWidth=1.8;ctx.stroke();
+  // head to the right
+  ctx.fillStyle='#F5CBAA';
+  ctx.beginPath();ctx.arc(34,-18,12,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle=C.black;ctx.lineWidth=1.8;ctx.stroke();
+  // hair
+  ctx.fillStyle=C.black;
+  ctx.beginPath();ctx.ellipse(34,-24,13,7,0,0,Math.PI*2);ctx.fill();
+  // spiral eyes (dazed)
+  ctx.strokeStyle=C.black;ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.arc(30,-18,2.5,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(30,-18);ctx.lineTo(31,-17);ctx.stroke();
+  ctx.beginPath();ctx.arc(38,-18,2.5,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(38,-18);ctx.lineTo(39,-17);ctx.stroke();
+  // arms splayed
+  ctx.strokeStyle=C.black;ctx.lineWidth=5;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(-10,-12);ctx.lineTo(-26,-6);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-4,-10);ctx.lineTo(-14,4);ctx.stroke();
+  // legs splayed
+  ctx.beginPath();ctx.moveTo(-20,-8);ctx.lineTo(-38,-14);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-22,-12);ctx.lineTo(-40,-2);ctx.stroke();
+  // little stars above head
+  const t=Math.floor((RECHARGE_FRAMES-rechargeTimer)/10)%3;
+  ctx.fillStyle='#FFD54F';ctx.font='bold 14px Space Grotesk,sans-serif';ctx.textAlign='center';
+  ctx.fillText(['✦','✧','★'][t],34,-38);
+  ctx.fillText(['✧','★','✦'][t],46,-32);
+  ctx.fillText(['★','✦','✧'][t],22,-32);
+  ctx.textAlign='left';
+  ctx.restore();
+}
+
+function drawAvatar(){
+  if(av.downed){drawDownedAvatar();return;}
+  ctx.save();ctx.translate(av.x,av.y);
+  if((av.hit||invulnTimer>0)&&Math.floor(frame/5)%2===0)ctx.globalAlpha=0.4;
+  if(!av.ducking){
+    const sw=Math.sin(av.legPhase);
+    // Jeans legs (denim blue)
+    ctx.strokeStyle='#1E3A8A';ctx.lineWidth=8;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(-6,-4);ctx.lineTo(-6+sw*12,22);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(6,-4);ctx.lineTo(6-sw*12,22);ctx.stroke();
+    // Shoes
+    ctx.fillStyle=C.black;
+    ctx.beginPath();ctx.ellipse(-6+sw*12,24,8,5,0.2,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(6-sw*12,24,8,5,-0.2,0,Math.PI*2);ctx.fill();
+    // Red T-shirt (rectangular torso)
+    ctx.fillStyle=C.red;
+    ctx.beginPath();ctx.roundRect(-16,-50,32,46,4);ctx.fill();
+    ctx.strokeStyle=C.black;ctx.lineWidth=1.8;ctx.stroke();
+    // Long red sleeves (thick strokes from shoulder to wrist)
+    ctx.strokeStyle=C.red;ctx.lineWidth=12;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(-16,-44);ctx.lineTo(-22+sw*10,-16);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(16,-44);ctx.lineTo(22-sw*10,-16);ctx.stroke();
+    // Sleeve outline
+    ctx.strokeStyle=C.black;ctx.lineWidth=1.2;
+    ctx.beginPath();ctx.moveTo(-22,-44);ctx.lineTo(-28+sw*10,-16);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(-10,-44);ctx.lineTo(-16+sw*10,-16);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(22,-44);ctx.lineTo(28-sw*10,-16);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(10,-44);ctx.lineTo(16-sw*10,-16);ctx.stroke();
+    // Red mitten hands at sleeve ends (no skin visible)
+    ctx.fillStyle=C.red;ctx.strokeStyle=C.black;ctx.lineWidth=1.6;
+    ctx.beginPath();ctx.arc(-22+sw*10,-14,7,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.arc(22-sw*10,-14,7,0,Math.PI*2);ctx.fill();ctx.stroke();
+    // Neck
+    ctx.fillStyle='#F5CBAA';ctx.fillRect(-4,-58,8,10);
+    // Head
+    ctx.fillStyle='#F5CBAA';ctx.beginPath();ctx.arc(0,-72,16,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=C.black;ctx.lineWidth=1.8;ctx.stroke();
+    // Messy black curls — round overlapping blobs only, no braids
+    ctx.fillStyle=C.black;
+    ctx.beginPath();ctx.ellipse(0,-82,21,11,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(-12,-84,8,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(9,-86,9,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(-2,-90,8,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(14,-82,8,0,Math.PI*2);ctx.fill();
+    // Curls hanging over the face
+    ctx.beginPath();ctx.arc(-13,-74,9,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(-4,-70,10,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(6,-72,10,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(14,-74,8,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(-10,-64,7,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(2,-62,8,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(12,-64,7,0,Math.PI*2);ctx.fill();
+    // Side curls down to jaw (round blobs, not braids)
+    ctx.beginPath();ctx.arc(-15,-60,6,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(15,-60,6,0,Math.PI*2);ctx.fill();
+  } else {
+    // Ducking: t-shirt blob + jeans
+    ctx.fillStyle=C.red;
+    ctx.beginPath();ctx.ellipse(-2,-14,28,14,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=C.black;ctx.lineWidth=1.8;ctx.stroke();
+    // Jeans legs (folded under)
+    ctx.strokeStyle='#1E3A8A';ctx.lineWidth=8;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(-14,-6);ctx.lineTo(-22,8);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,-6);ctx.lineTo(8,8);ctx.stroke();
+    // Head
+    ctx.fillStyle='#F5CBAA';ctx.beginPath();ctx.arc(26,-24,14,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=C.black;ctx.lineWidth=1.8;ctx.stroke();
+    // Messy curls covering the face
+    ctx.fillStyle=C.black;
+    ctx.beginPath();ctx.ellipse(26,-33,18,9,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(18,-26,7,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(26,-22,8,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(34,-26,7,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(22,-16,5,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(31,-16,5,0,Math.PI*2);ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawPrison(px){
+  // Festive finish building (city hall / community house) with fireworks
+  const pw=220,ph=220,py=GROUND-ph;
+  // Fireworks in the sky behind the building
+  const burstColors=['#FFD54F','#EF5350','#42A5F5','#AB47BC','#66BB6A','#FF7043'];
+  for(let i=0;i<6;i++){
+    const seed=i*97;
+    const fx=px+20+((seed*53)%(pw-40));
+    const fy=py-160+((seed*31)%120);
+    const phase=(frame*0.05+i*0.7)%1; // 0..1 loop
+    const r=8+phase*36;
+    const a=1-phase;
+    ctx.globalAlpha=Math.max(0,a);
+    ctx.strokeStyle=burstColors[i%burstColors.length];
+    ctx.lineWidth=2.5;ctx.lineCap='round';
+    for(let s=0;s<12;s++){
+      const ang=s*(Math.PI*2/12);
+      ctx.beginPath();
+      ctx.moveTo(fx+Math.cos(ang)*r*0.55, fy+Math.sin(ang)*r*0.55);
+      ctx.lineTo(fx+Math.cos(ang)*r,      fy+Math.sin(ang)*r);
+      ctx.stroke();
+    }
+    // sparkle dots
+    ctx.fillStyle=burstColors[(i+2)%burstColors.length];
+    for(let s=0;s<8;s++){
+      const ang=s*(Math.PI*2/8)+0.2;
+      ctx.beginPath();ctx.arc(fx+Math.cos(ang)*r*0.9, fy+Math.sin(ang)*r*0.9,2,0,Math.PI*2);ctx.fill();
+    }
+  }
+  ctx.globalAlpha=1;
+
+  // Building body — warm yellow facade
+  ctx.fillStyle='#FFE082';
+  ctx.fillRect(px,py,pw,ph);
+  ctx.strokeStyle='#5D4037';ctx.lineWidth=3;ctx.strokeRect(px,py,pw,ph);
+  // Pitched roof
+  ctx.fillStyle='#EF5350';
+  ctx.beginPath();
+  ctx.moveTo(px-10,py);
+  ctx.lineTo(px+pw/2,py-50);
+  ctx.lineTo(px+pw+10,py);
+  ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#B71C1C';ctx.lineWidth=2;ctx.stroke();
+  // Flag on top
+  ctx.strokeStyle='#5D4037';ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.moveTo(px+pw/2,py-50);ctx.lineTo(px+pw/2,py-90);ctx.stroke();
+  ctx.fillStyle='#FFEB3B';
+  ctx.beginPath();
+  ctx.moveTo(px+pw/2,py-88);
+  ctx.lineTo(px+pw/2+28,py-80);
+  ctx.lineTo(px+pw/2,py-72);
+  ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#5D4037';ctx.lineWidth=1;ctx.stroke();
+  // Bunting / garland across the facade
+  ctx.strokeStyle='#5D4037';ctx.lineWidth=1.5;
+  ctx.beginPath();
+  ctx.moveTo(px+4,py+18);
+  ctx.quadraticCurveTo(px+pw/2,py+44,px+pw-4,py+18);
+  ctx.stroke();
+  const flagCols=['#EF5350','#42A5F5','#FFEB3B','#66BB6A','#AB47BC','#FF7043'];
+  for(let k=0;k<8;k++){
+    const t=(k+0.5)/8;
+    const fx=px+4+(pw-8)*t;
+    // sag of the rope at t (quadratic bezier)
+    const fy=py+18 + (1-Math.pow(2*t-1,2))*26;
+    ctx.fillStyle=flagCols[k%flagCols.length];
+    ctx.beginPath();
+    ctx.moveTo(fx-6,fy);
+    ctx.lineTo(fx+6,fy);
+    ctx.lineTo(fx,fy+12);
+    ctx.closePath();ctx.fill();
+  }
+  // Windows (bright, lit)
+  ctx.fillStyle='#FFF59D';ctx.strokeStyle='#5D4037';ctx.lineWidth=1.5;
+  for(let r=0;r<3;r++)for(let c=0;c<3;c++){
+    const wx=px+22+c*64,wy=py+70+r*42;
+    ctx.fillRect(wx,wy,40,28);ctx.strokeRect(wx,wy,40,28);
+    ctx.beginPath();ctx.moveTo(wx+20,wy);ctx.lineTo(wx+20,wy+28);
+    ctx.moveTo(wx,wy+14);ctx.lineTo(wx+40,wy+14);ctx.stroke();
+  }
+  // Big welcoming door (green) with arched top
+  const dw=64,dh=92,dx=px+pw/2-dw/2,dy=py+ph-dh;
+  ctx.fillStyle='#66BB6A';
+  ctx.beginPath();
+  ctx.moveTo(dx,dy+dh);
+  ctx.lineTo(dx,dy+18);
+  ctx.quadraticCurveTo(dx+dw/2,dy-10,dx+dw,dy+18);
+  ctx.lineTo(dx+dw,dy+dh);
+  ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#1B5E20';ctx.lineWidth=2;ctx.stroke();
+  ctx.fillStyle='#FFD54F';
+  ctx.beginPath();ctx.arc(dx+dw-10,dy+dh/2+8,2.5,0,Math.PI*2);ctx.fill();
+  // Welcome banner above door
+  ctx.fillStyle='#FFFFFF';ctx.strokeStyle='#5D4037';ctx.lineWidth=2.5;
+  ctx.fillRect(px+pw/2-90,py-30,180,42);ctx.strokeRect(px+pw/2-90,py-30,180,42);
+  ctx.fillStyle=C.red;ctx.font='bold 16px Space Grotesk,sans-serif';ctx.textAlign='center';
+  ctx.fillText('EQUAL PAY!',px+pw/2,py-12);
+  ctx.fillStyle='#5D4037';ctx.font='bold 10px Space Grotesk,sans-serif';
+  ctx.fillText('Finish • Welkom',px+pw/2,py+2);
+  ctx.textAlign='left';
+}
+
+function drawObstacle(o){
+  const def=OBS_DEFS.find(d=>d.id===o.defId);
+  if(!def)return;
+  ctx.save();ctx.translate(o.x,o.y);
+  def.draw(o.w,o.h);
+  const badgeY=def.action==='jump'?o.h+26:o.h+18;
+  obsBadge(def.action,o.w/2,badgeY);
+  ctx.restore();
+}
+
+function drawTransitionBanner(){
+  if(!transitionBanner)return;
+  const t=transitionBanner.timer;
+  const alpha=t>150?(180-t)/30:t>30?1:t/30;
+  ctx.globalAlpha=Math.min(1,Math.max(0,alpha));
+  const bw=340,bh=74,bx=(VW-bw)/2,by=(VH-bh)/2-20;
+  ctx.fillStyle=transitionBanner.color;
+  ctx.fillRect(bx,by,bw,bh);
+  ctx.strokeStyle=C.white;ctx.lineWidth=3;ctx.strokeRect(bx,by,bw,bh);
+  ctx.fillStyle=C.white;ctx.font='bold 13px Space Grotesk,sans-serif';ctx.textAlign='center';
+  ctx.fillText('Volgend level:',VW/2,by+24);
+  ctx.font='bold 30px Space Grotesk,sans-serif';
+  ctx.fillText(transitionBanner.label,VW/2,by+58);
+  ctx.textAlign='left';ctx.globalAlpha=1;
+}
+
+function drawHUD(){
+  ctx.fillStyle='rgba(255,255,255,0.97)';
+  ctx.fillRect(0,0,VW,HUD_H);
+  ctx.strokeStyle='#CCC';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(0,HUD_H);ctx.lineTo(VW,HUD_H);ctx.stroke();
+
+  ctx.fillStyle=C.black;ctx.font='bold 15px Space Grotesk,sans-serif';ctx.textAlign='left';
+  ctx.fillText('Afstand:',12,32);
+  ctx.fillStyle=C.red;ctx.font='bold 15px Space Grotesk,sans-serif';
+  ctx.fillText(Math.floor(distancePx/60)+'m',96,32);
+
+  const tLabels=['💼 Carrière','👶 Gezin','👁 Cultuur'];
+  const tColors=['#2C3E6B','#7A3B10','#5B2A6B'];
+  let tx=200;
+  for(let i=0;i<3;i++){
+    const active=i===currentThemeIdx;
+    ctx.fillStyle=active?tColors[i]:'#EEEEEE';
+    const pill_w=140,pill_h=34;
+    ctx.beginPath();ctx.roundRect(tx,9,pill_w,pill_h,8);ctx.fill();
+    if(active){ctx.strokeStyle=tColors[i];ctx.lineWidth=2;ctx.stroke();}
+    ctx.fillStyle=active?C.white:'#999';
+    ctx.font=active?'bold 13px Space Grotesk,sans-serif':'12px Space Grotesk,sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(tLabels[i],tx+pill_w/2,30);
+    tx+=148;
+  }
+
+  ctx.fillStyle=C.black;ctx.font='bold 13px Space Grotesk,sans-serif';ctx.textAlign='right';
+  ctx.fillText('Levens:',VW-136,32);
+  for(let i=0;i<3;i++){
+    drawSmallClock(VW-106+i*32,26,i<lives);
+  }
+  ctx.textAlign='left';
+}
+
+// Centered "Wist je dat?" modal with loading bar during recharge
+function drawRechargeModal(){
+  if(gameState!=='recharging')return;
+  // dim background
+  ctx.fillStyle='rgba(0,0,0,0.55)';
+  ctx.fillRect(0,HUD_H,VW,VH-HUD_H);
+
+  const mw=720, mh=260, mx=(VW-mw)/2, my=(VH-mh)/2-10;
+  // panel
+  ctx.fillStyle=C.white;
+  ctx.beginPath();ctx.roundRect(mx,my,mw,mh,14);ctx.fill();
+  ctx.strokeStyle=C.red;ctx.lineWidth=4;
+  ctx.beginPath();ctx.roundRect(mx,my,mw,mh,14);ctx.stroke();
+
+  // red header strip (rounded top corners only)
+  ctx.save();
+  ctx.beginPath();ctx.roundRect(mx,my,mw,46,[14,14,0,0]);ctx.clip();
+  ctx.fillStyle=C.red;ctx.fillRect(mx,my,mw,46);
+  ctx.restore();
+  ctx.fillStyle=C.white;ctx.font='bold 18px Space Grotesk,sans-serif';ctx.textAlign='left';
+  ctx.fillText('💡  Wist je dat?',mx+20,my+30);
+  ctx.textAlign='right';ctx.font='bold 14px Space Grotesk,sans-serif';
+  ctx.fillText(rechargeFactTitle.toUpperCase(),mx+mw-20,my+30);
+
+  // wrapped body text
+  ctx.fillStyle=C.black;ctx.font='15px Space Grotesk,sans-serif';ctx.textAlign='left';
+  const words=rechargeFactText.split(' ');let line='',lines=[],maxw=mw-44;
+  for(const w of words){const t=line+w+' ';if(ctx.measureText(t).width>maxw&&line){lines.push(line.trim());line=w+' ';}else line=t;}
+  if(line)lines.push(line.trim());
+  const startY=my+78, lh=22;
+  lines.slice(0,6).forEach((l,i)=>ctx.fillText(l,mx+22,startY+i*lh));
+
+  // loading bar
+  const barW=mw-60, barH=18, barX=mx+30, barY=my+mh-46;
+  const pct=1-(rechargeTimer/RECHARGE_FRAMES);
+  ctx.fillStyle='#EEE';
+  ctx.beginPath();ctx.roundRect(barX,barY,barW,barH,9);ctx.fill();
+  ctx.fillStyle=C.red;
+  ctx.beginPath();ctx.roundRect(barX,barY,Math.max(2,barW*pct),barH,9);ctx.fill();
+  ctx.strokeStyle=C.black;ctx.lineWidth=2;
+  ctx.beginPath();ctx.roundRect(barX,barY,barW,barH,9);ctx.stroke();
+  // seconds remaining
+  const sec=Math.ceil(rechargeTimer/60);
+  ctx.fillStyle=C.black;ctx.font='bold 13px Space Grotesk,sans-serif';ctx.textAlign='center';
+  ctx.fillText('Herladen… '+sec+'s',VW/2,barY+barH+22);
+  ctx.textAlign='left';
+}
+
+function draw(){
+  const theme=getTheme();
+  ctx.clearRect(0,0,VW,VH);
+  ctx.fillStyle=theme.bgColor;
+  ctx.fillRect(0,HUD_H,VW,VH-HUD_H);
+
+  for(let s of stars){ctx.fillStyle=theme.accentColor;ctx.globalAlpha=0.07;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;}
+  for(let b of bgB){ctx.fillStyle=theme.buildColor;ctx.fillRect(b.x,GROUND-b.h,b.w,b.h);ctx.strokeStyle=theme.buildStroke;ctx.lineWidth=1;ctx.strokeRect(b.x,GROUND-b.h,b.w,b.h);}
+  for(let b of fgB){
+    ctx.fillStyle=C.white;ctx.strokeStyle='#CCC';ctx.lineWidth=1.8;
+    ctx.fillRect(b.x,GROUND-b.h,b.w,b.h);ctx.strokeRect(b.x,GROUND-b.h,b.w,b.h);
+    if(b.win)for(let r=0;r<4;r++)for(let c=0;c<3;c++){ctx.fillStyle='#EEE';ctx.fillRect(b.x+9+c*(b.w/3-2),GROUND-b.h+14+r*26,b.w/3-9,16);}
+  }
+
+  for(let b of billboards){
+    if(b.x>-320&&b.x<VW+200){
+      const by=GROUND-195;
+      ctx.fillStyle=theme.accentColor;ctx.fillRect(b.x,by,b.w,b.h);
+      ctx.strokeStyle=C.black;ctx.lineWidth=2.5;ctx.strokeRect(b.x,by,b.w,b.h);
+      ctx.fillStyle=C.white;ctx.font='bold 14px Space Grotesk,sans-serif';ctx.textAlign='center';
+      const words=b.msg.split(' ');let line='',lines=[],mw=b.w-20;
+      for(let w of words){const t=line+w+' ';if(ctx.measureText(t).width>mw&&line){lines.push(line.trim());line=w+' ';}else line=t;}
+      if(line)lines.push(line.trim());
+      const lh=20,sy2=by+b.h/2-(lines.length-1)*lh/2+6;
+      lines.forEach((l,i)=>ctx.fillText(l,b.x+b.w/2,sy2+i*lh));
+      ctx.textAlign='left';
+      ctx.strokeStyle=C.black;ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(b.x+b.w/2,by+b.h);ctx.lineTo(b.x+b.w/2,GROUND-100);ctx.stroke();
+    }
+  }
+
+  if(prisonVisible)drawPrison(prisonX);
+  ctx.fillStyle=theme.groundColor;ctx.fillRect(0,GROUND,VW,VH-GROUND);
+  ctx.fillStyle=theme.markColor;
+  for(let m of gMarks)ctx.fillRect(m.x,GROUND+20,60,7);
+  for(let o of obstacles)drawObstacle(o);
+  drawAvatar();
+  drawTransitionBanner();
+  drawHUD();
+  drawRechargeModal();
+
+  ctx.fillStyle='rgba(26,26,26,0.45)';ctx.font='12px Space Grotesk,sans-serif';ctx.textAlign='center';
+  ctx.fillText('↑ springen   ↓ bukken   (swipe op mobiel)',VW/2,VH-10);
+  ctx.textAlign='left';
+}
+
+function loop(){running=true;update();draw();if(gameState==='playing'||gameState==='recharging')requestAnimationFrame(loop);else running=false;}
+
+function showEnd(){
+  screen.innerHTML='';screen.style.display='flex';
+  const t=document.createElement('div');t.id='endTitle';
+  const s=document.createElement('div');s.id='endSub';
+  const c=document.createElement('div');c.id='copyMsg';
+  if(won){
+    t.textContent='Proficiat, jij krijgt equal pay!';
+    s.innerHTML='Dicht ook de loonkloof in het echte leven via <strong>unequalpayday.be</strong>';
+  } else {
+    t.textContent='Jammer, jij haalde de Equal Pay Run niet en krijgt dus geen gelijk loon.';
+    s.innerHTML='Je bent niet alleen. Dicht de loonkloof op <strong>unequalpayday.be</strong>';
+  }
+  const shareB=document.createElement('button');shareB.className='btn';shareB.textContent='Deel dit spel';
+  shareB.addEventListener('click',()=>{
+    const txt=won
+      ?'Ik heb de Equal Pay Run voltooid: de enige plek met gelijke verloning voor mannen en vrouwen! Daarbuiten werken vrouwen elke dag gratis vanaf 15:24. #Loonkloof #UnequalPayDay'
+      :'Ik heb de Equal Pay Run niet gehaald en krijg dus geen gelijk loon. Vanaf 15:24 werken vrouwen gratis. #Loonkloof #UnequalPayDay';
+    navigator.clipboard.writeText(txt).then(()=>{c.textContent='Gekopieerd naar klembord!';});
+  });
+  const reB=document.createElement('button');reB.className='btn sec';reB.textContent='Opnieuw spelen';
+  reB.addEventListener('click',startGame);
+  screen.appendChild(t);screen.appendChild(s);screen.appendChild(shareB);screen.appendChild(c);screen.appendChild(reB);
+}
+draw();
+</script>
+</body>
+</html>
