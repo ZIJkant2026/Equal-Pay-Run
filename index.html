@@ -9,7 +9,7 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;overflow:hidden;background:#1A1A1A;font-family:'Space Grotesk',sans-serif;user-select:none}
 #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#1A1A1A}
-canvas{display:block}
+canvas{display:block;touch-action:none}
 #screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;z-index:10;padding:2rem;text-align:center}
 #screen h1{font-size:clamp(2rem,5vw,4rem);font-weight:900;color:#1A1A1A;text-transform:uppercase;letter-spacing:-2px;line-height:1;margin-bottom:0.75rem}
 #screen .sub{font-size:clamp(0.85rem,1.8vw,1.05rem);color:#333;max-width:520px;line-height:1.7;margin-bottom:1.75rem}
@@ -32,7 +32,7 @@ canvas{display:block}
       Ontwijk de obstakels die vrouwen tegenkomen tijdens hun loopbaan.<br><br>
       Loop door 3 levels op weg naar equal pay: <strong>carrière · gezin · cultuur</strong>.<br><br>
       <strong>Laptop: ↑ springen &nbsp;·&nbsp; ↓ bukken</strong><br>
-      <strong>Gsm: swipe omhoog of omlaag</strong>
+      <strong>Gsm: tik boven = springen · tik onder = bukken · of swipe</strong>
     </p>
     <button class="btn" id="startBtn">Start het spel</button>
   </div>
@@ -44,7 +44,8 @@ const ctx=canvas.getContext('2d');
 const screen=document.getElementById('screen');
 document.getElementById('startBtn').addEventListener('click',startGame);
 
-const DPR = window.devicePixelRatio||1;
+// Cap DPR at 2 — phones with DPR 3 draw 9× the pixels for no visible gain
+const DPR=Math.min(window.devicePixelRatio||1,2);
 const VW=1200,VH=500;
 canvas.width=VW*DPR; canvas.height=VH*DPR;
 canvas.style.width=VW+'px'; canvas.style.height=VH+'px';
@@ -54,13 +55,17 @@ function resize(){
   const sx=window.innerWidth/VW,sy=window.innerHeight/VH,sc=Math.min(sx,sy);
   canvas.style.width=Math.round(VW*sc)+'px'; canvas.style.height=Math.round(VH*sc)+'px';
 }
-resize(); window.addEventListener('resize',resize);
+resize();
+window.addEventListener('resize',resize);
+window.addEventListener('orientationchange',()=>setTimeout(resize,200));
 
 const C={white:'#FFFFFF',red:'#CC0000',black:'#1A1A1A'};
+const TARGET_DT=1000/60; // 16.67ms — one tick at 60fps
 const HUD_H=52,GROUND=VH-72,AV_H_STAND=80,AV_H_DUCK=40,GRAVITY=0.62,JUMP_FORCE=-16.5;
 const MIN_OBS_GAP=520;
 const SPEED_START=4.2, SPEED_MAX=6.5;
-const RECHARGE_FRAMES=7*60; // 7 seconds at ~60fps
+const RECHARGE_MS=7000; // 7 seconds in ms
+const RECHARGE_FRAMES=RECHARGE_MS;
 
 const THEMES=[
   {id:'carriere',label:'Carrière',bgColor:'#E8F0FA',groundColor:'#2C3E6B',markColor:'#5B80C8',buildColor:'#D0DEEF',buildStroke:'#8FA8D0',accentColor:'#2C3E6B'},
@@ -73,12 +78,12 @@ const TRANSITIONS=[
 ];
 
 const MSGS=[
-  'Voor elke euro die een man verdient krijgt een vrouw 80 cent',
-  'Mensen praten liever over seks dan over hun loon.',
-  'Betrokken papa\u2019s dichten mee de loonkloof.',
-  'Vrouwen hebben 21 procent minder pensioen.',
-  'Eerlijke verdeling huishouden = eerlijke kansen op het werk.',
-  'Bedrijven met een goede balans tussen werk en privé boosten equal pay.',
+  {text:'Voor elke euro die een man verdient krijgt een vrouw 80 cent', positive:false},
+  {text:'Mensen praten liever over seks dan over hun loon.', positive:false},
+  {text:'Betrokken papa\u2019s dichten mee de loonkloof.', positive:true},
+  {text:'Vrouwen hebben 21 procent minder pensioen.', positive:false},
+  {text:'Eerlijke verdeling huishouden = eerlijke kansen op het werk.', positive:true},
+  {text:'Bedrijven met een goede balans tussen werk en privé boosten equal pay.', positive:true},
 ];
 
 function obsLabel(text,x,y){
@@ -153,79 +158,171 @@ const OBS_DEFS=[
 
   // Loontaboe: lips with shushing finger — duck
   {id:'loontaboe',label:'Loontaboe',action:'duck',theme:'carriere',
-   w:150,h:0,
+   w:120,h:0,
    desc:'Praten over geld is moeilijk. Als je niet weet wat je collega\u2019s verdienen, is equal pay veraf.',
-   draw(w,h){
-     const sh=60, cx=w/2, cy=sh/2-2;
-     // suspension lines
-     ctx.strokeStyle='#555';ctx.lineWidth=2;ctx.setLineDash([4,4]);
-     ctx.beginPath();ctx.moveTo(cx-30,0);ctx.lineTo(cx-30,-22);ctx.stroke();
-     ctx.beginPath();ctx.moveTo(cx+30,0);ctx.lineTo(cx+30,-22);ctx.stroke();
-     ctx.setLineDash([]);
-     // soft circular background
-     ctx.fillStyle='#FFF3E0';ctx.strokeStyle='#5D4037';ctx.lineWidth=2.5;
-     ctx.beginPath();ctx.arc(cx,cy,32,0,Math.PI*2);ctx.fill();ctx.stroke();
-     // lips (closed mouth)
-     ctx.fillStyle=C.red;ctx.strokeStyle='#5D4037';ctx.lineWidth=1.5;
-     ctx.beginPath();
-     ctx.moveTo(cx-18,cy+4);
-     ctx.bezierCurveTo(cx-12,cy-6, cx+12,cy-6, cx+18,cy+4);
-     ctx.bezierCurveTo(cx+12,cy+10, cx-12,cy+10, cx-18,cy+4);
-     ctx.closePath();ctx.fill();ctx.stroke();
-     ctx.beginPath();ctx.moveTo(cx-18,cy+4);ctx.lineTo(cx+18,cy+4);ctx.stroke();
-     // vertical index finger in front of the lips
-     ctx.fillStyle='#F5CBAA';ctx.strokeStyle='#5D4037';ctx.lineWidth=1.5;
-     ctx.beginPath();ctx.roundRect(cx-4,cy-22,8,28,4);ctx.fill();ctx.stroke();
-     ctx.fillStyle='#FBE9E7';
-     ctx.beginPath();ctx.ellipse(cx,cy-20,3,3,0,0,Math.PI*2);ctx.fill();
-     // "Shhh" text
-     ctx.fillStyle='#1A1A1A';ctx.font='italic bold 14px Space Grotesk,sans-serif';ctx.textAlign='left';
-     ctx.fillText('Shhh…',cx+30,cy-6);
-     ctx.fillStyle='#5D4037';ctx.font='bold 11px Space Grotesk,sans-serif';ctx.textAlign='center';
-     ctx.fillText('Loontaboe',cx,sh+14);ctx.textAlign='left';
-   }},
+    draw(w,h){
+      const cx=w/2;
+      // Suspension lines
+      ctx.strokeStyle='#555';ctx.lineWidth=2;ctx.setLineDash([4,4]);
+      ctx.beginPath();ctx.moveTo(cx-22,0);ctx.lineTo(cx-22,-22);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx+22,0);ctx.lineTo(cx+22,-22);ctx.stroke();
+      ctx.setLineDash([]);
 
-  // Vrouwen- en mannenjobs: tilted balance scale — jump
+      // === GHOST/OUTLINE figure — transparent fill, only strokes visible ===
+      const col='#2C3E6B'; // dark blue outline, like the carrière theme
+      const hy=42;  // head centre y
+      const hr=28;  // head radius (smaller)
+
+      // Neck (outline only)
+      ctx.strokeStyle=col;ctx.lineWidth=2.2;ctx.lineJoin='round';
+      ctx.beginPath();ctx.roundRect(cx-7,hy+hr-2,14,14,2);ctx.stroke();
+
+      // Head circle (outline only, transparent)
+      ctx.strokeStyle=col;ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(cx,hy,hr,0,Math.PI*2);ctx.stroke();
+
+      // Hair — short curved strokes on top arc only
+      ctx.strokeStyle=col;ctx.lineWidth=2;ctx.lineCap='round';
+      ctx.beginPath();ctx.arc(cx,hy,hr+3,Math.PI*1.15,Math.PI*1.85);ctx.stroke();
+      // small side hair tufts
+      ctx.beginPath();ctx.moveTo(cx-hr*0.85,hy-hr*0.52);
+      ctx.quadraticCurveTo(cx-hr-5,hy-hr*0.3,cx-hr-2,hy-2);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx+hr*0.85,hy-hr*0.52);
+      ctx.quadraticCurveTo(cx+hr+5,hy-hr*0.3,cx+hr+2,hy-2);ctx.stroke();
+
+      // Ears (small arcs, outline only)
+      ctx.beginPath();ctx.arc(cx-hr,hy,5,Math.PI*0.6,Math.PI*1.4);ctx.stroke();
+      ctx.beginPath();ctx.arc(cx+hr,hy,5,Math.PI*1.6,Math.PI*0.4);ctx.stroke();
+
+      // Eyebrows (worried — inner ends raised)
+      ctx.lineWidth=2;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(cx-17,hy-15);ctx.quadraticCurveTo(cx-10,hy-20,cx-5,hy-17);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx+17,hy-15);ctx.quadraticCurveTo(cx+10,hy-20,cx+5,hy-17);ctx.stroke();
+
+      // Eyes (outlined circles + pupils as filled dots)
+      ctx.lineWidth=1.8;
+      ctx.beginPath();ctx.ellipse(cx-10,hy-7,6,7,0,0,Math.PI*2);ctx.stroke();
+      ctx.beginPath();ctx.ellipse(cx+10,hy-7,6,7,0,0,Math.PI*2);ctx.stroke();
+      // Pupils — small filled dots
+      ctx.fillStyle=col;
+      ctx.beginPath();ctx.arc(cx-10,hy-6,2.5,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(cx+10,hy-6,2.5,0,Math.PI*2);ctx.fill();
+
+      // Nose (simple V-notch)
+      ctx.lineWidth=1.6;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(cx,hy+4);ctx.lineTo(cx-3,hy+10);
+      ctx.quadraticCurveTo(cx,hy+12,cx+3,hy+10);ctx.stroke();
+
+      // === TAPE X OVER MOUTH — coloured, sits on transparent face ===
+      const my=hy+20; // mouth/tape centre y
+      const tw=20, th=9; // tape half-width, half-height
+
+      // Strip 1 (darker, behind)
+      ctx.save();ctx.translate(cx,my);ctx.rotate(0.44);
+      ctx.fillStyle='#455A64';
+      ctx.beginPath();ctx.roundRect(-tw,-th/2,tw*2,th,3);ctx.fill();
+      ctx.strokeStyle='#263238';ctx.lineWidth=1.2;ctx.stroke();
+      ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=0.8;
+      for(let xi=-tw+6;xi<tw;xi+=6){ctx.beginPath();ctx.moveTo(xi,-th/2+1);ctx.lineTo(xi,th/2-1);ctx.stroke();}
+      ctx.restore();
+
+      // Strip 2 (lighter, on top)
+      ctx.save();ctx.translate(cx,my);ctx.rotate(-0.44);
+      ctx.fillStyle='#607D8B';
+      ctx.beginPath();ctx.roundRect(-tw,-th/2,tw*2,th,3);ctx.fill();
+      ctx.strokeStyle='#263238';ctx.lineWidth=1.2;ctx.stroke();
+      ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=0.8;
+      for(let xi=-tw+6;xi<tw;xi+=6){ctx.beginPath();ctx.moveTo(xi,-th/2+1);ctx.lineTo(xi,th/2-1);ctx.stroke();}
+      ctx.restore();
+
+      // Label onderaan het icoon (zichtbaar voor de speler)
+      obsLabel('Loontaboe',w/2,hy+hr+28);
+    }},
+
+  // Vrouwen- en mannenjobs: balance scale with nurse vs tech worker — jump
   {id:'genderjobs',label:'Vrouwen- en mannenjobs',action:'jump',theme:'carriere',
-   w:130,h:70,
+   w:130,h:96,
    desc:'Veel vrouwen werken in de zorg. Deze jobs betalen slechter dan jobs in tech, wetenschappen of de industrie (waar vooral mannen werken).',
    draw(w,h){
      const cx=w/2, baseY=h-4;
      // stand
      ctx.fillStyle='#5D4037';
-     ctx.fillRect(cx-14,baseY-6,28,6);
-     ctx.fillRect(cx-3,baseY-46,6,40);
+     ctx.fillRect(cx-16,baseY-6,32,6);
+     ctx.fillRect(cx-3,baseY-50,6,44);
      // tilted beam (women side down)
-     const tilt=0.22;
-     ctx.save();
-     ctx.translate(cx,baseY-46);
-     ctx.rotate(tilt);
-     ctx.fillStyle='#8D6E63';
-     ctx.fillRect(-48,-3,96,6);
-     ctx.strokeStyle='#5D4037';ctx.lineWidth=2;
-     // left pan: small coin
-     ctx.beginPath();ctx.moveTo(-44,0);ctx.lineTo(-44,12);ctx.stroke();
-     ctx.fillStyle='#FFCDD2';
-     ctx.beginPath();ctx.ellipse(-44,16,16,5,0,0,Math.PI*2);ctx.fill();ctx.stroke();
-     ctx.fillStyle='#FFD54F';
-     ctx.beginPath();ctx.arc(-44,12,5,0,Math.PI*2);ctx.fill();ctx.stroke();
-     ctx.fillStyle='#5D4037';ctx.font='bold 8px Space Grotesk,sans-serif';ctx.textAlign='center';
-     ctx.fillText('€',-44,15);
-     // right pan: big coin
-     ctx.beginPath();ctx.moveTo(44,0);ctx.lineTo(44,-12);ctx.stroke();
-     ctx.fillStyle='#BBDEFB';
-     ctx.beginPath();ctx.ellipse(44,-16,18,5,0,0,Math.PI*2);ctx.fill();ctx.stroke();
-     ctx.fillStyle='#FFC107';
-     ctx.beginPath();ctx.arc(44,-22,10,0,Math.PI*2);ctx.fill();ctx.stroke();
-     ctx.fillStyle='#1A1A1A';ctx.font='bold 12px Space Grotesk,sans-serif';
-     ctx.fillText('€',44,-18);
-     ctx.restore();
-     // gender labels under each pan
-     ctx.fillStyle=C.red;ctx.font='bold 12px Space Grotesk,sans-serif';ctx.textAlign='center';
-     ctx.fillText('♀',cx-44,baseY-26);
-     ctx.fillStyle='#1565C0';
-     ctx.fillText('♂',cx+44,baseY-50);
-     ctx.textAlign='left';
+      const tilt=0.18;
+      ctx.save();
+      ctx.translate(cx,baseY-50);
+      ctx.rotate(tilt);
+      ctx.fillStyle='#8D6E63';
+      ctx.fillRect(-50,-3,100,6);
+      ctx.strokeStyle='#5D4037';ctx.lineWidth=2;
+      // suspension cables
+      ctx.beginPath();ctx.moveTo(-44,0);ctx.lineTo(-44,18);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(44,0);ctx.lineTo(44,-18);ctx.stroke();
+      ctx.restore();
+
+      // ── LEFT pan (lower): female nurse with red heart
+      const lx=cx-38, ly=baseY-20;
+     // pan
+     ctx.fillStyle='#FFCDD2';ctx.strokeStyle='#5D4037';ctx.lineWidth=2;
+     ctx.beginPath();ctx.ellipse(lx,ly,22,5,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+     // body (white nurse uniform)
+     ctx.fillStyle='#FFFFFF';
+     ctx.beginPath();ctx.roundRect(lx-8,ly-22,16,20,3);ctx.fill();
+     ctx.strokeStyle='#5D4037';ctx.lineWidth=1.2;ctx.stroke();
+     // red cross on uniform
+     ctx.fillStyle=C.red;
+     ctx.fillRect(lx-1,ly-18,2,8);ctx.fillRect(lx-4,ly-15,8,2);
+     // head (light skin)
+     ctx.fillStyle='#F5CBAA';
+     ctx.beginPath();ctx.arc(lx,ly-28,6,0,Math.PI*2);ctx.fill();ctx.stroke();
+     // nurse cap (white with red cross)
+     ctx.fillStyle='#FFFFFF';
+     ctx.beginPath();ctx.roundRect(lx-6,ly-34,12,4,1);ctx.fill();ctx.stroke();
+     ctx.fillStyle=C.red;
+     ctx.fillRect(lx-0.5,ly-33,1,3);ctx.fillRect(lx-2,ly-32.5,3,1);
+     // arms holding heart
+     ctx.strokeStyle='#F5CBAA';ctx.lineWidth=2.5;ctx.lineCap='round';
+     ctx.beginPath();ctx.moveTo(lx-7,ly-16);ctx.lineTo(lx-3,ly-10);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(lx+7,ly-16);ctx.lineTo(lx+3,ly-10);ctx.stroke();
+     // red heart in hands
+     ctx.fillStyle=C.red;
+     ctx.beginPath();
+     ctx.moveTo(lx,ly-6);
+     ctx.bezierCurveTo(lx-6,ly-12, lx-6,ly-3, lx,ly-1);
+     ctx.bezierCurveTo(lx+6,ly-3, lx+6,ly-12, lx,ly-6);
+     ctx.closePath();ctx.fill();
+     ctx.strokeStyle='#8B1A1A';ctx.lineWidth=1;ctx.stroke();
+
+     // ── RIGHT pan (higher): black man with laptop
+      const rx=cx+38, ry=baseY-56;
+     // pan
+     ctx.fillStyle='#BBDEFB';ctx.strokeStyle='#5D4037';ctx.lineWidth=2;
+     ctx.beginPath();ctx.ellipse(rx,ry,22,5,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+     // body (dark suit / hoodie)
+     ctx.fillStyle='#37474F';
+     ctx.beginPath();ctx.roundRect(rx-9,ry-22,18,20,3);ctx.fill();
+     ctx.strokeStyle='#1A1A1A';ctx.lineWidth=1.2;ctx.stroke();
+     // head (dark skin)
+     ctx.fillStyle='#5D3A1F';
+     ctx.beginPath();ctx.arc(rx,ry-28,6,0,Math.PI*2);ctx.fill();ctx.stroke();
+     // short hair
+     ctx.fillStyle=C.black;
+     ctx.beginPath();ctx.arc(rx,ry-31,6,Math.PI,Math.PI*2);ctx.fill();
+     // arms holding laptop
+     ctx.strokeStyle='#5D3A1F';ctx.lineWidth=2.5;ctx.lineCap='round';
+     ctx.beginPath();ctx.moveTo(rx-8,ry-15);ctx.lineTo(rx-5,ry-8);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(rx+8,ry-15);ctx.lineTo(rx+5,ry-8);ctx.stroke();
+     // laptop (open)
+     ctx.fillStyle='#90A4AE';
+     ctx.beginPath();ctx.roundRect(rx-9,ry-9,18,2,1);ctx.fill();
+     ctx.strokeStyle='#1A1A1A';ctx.lineWidth=1;ctx.stroke();
+     ctx.fillStyle='#263238';
+     ctx.beginPath();ctx.moveTo(rx-7,ry-9);ctx.lineTo(rx-9,ry-18);ctx.lineTo(rx+9,ry-18);ctx.lineTo(rx+7,ry-9);ctx.closePath();ctx.fill();ctx.stroke();
+     ctx.fillStyle='#4FC3F7';
+     ctx.fillRect(rx-7,ry-17,14,7);
+
      obsLabel('Vrouwen- en mannenjobs',w/2,-12);
    }},
 
@@ -250,18 +347,10 @@ const OBS_DEFS=[
         ctx.fillStyle=C.black;
         ctx.beginPath();ctx.arc(cx-4,h-55,1.5,0,Math.PI*2);ctx.fill();
         ctx.beginPath();ctx.arc(cx+4,h-55,1.5,0,Math.PI*2);ctx.fill();
-        // Pacifier (tut): outer shield ring + teat sticking out
-        // shield (large flat ring)
-        ctx.fillStyle='#FF8A65';ctx.strokeStyle=C.black;ctx.lineWidth=1.4;
-        ctx.beginPath();ctx.ellipse(cx,h-46,9,6,0,0,Math.PI*2);ctx.fill();ctx.stroke();
-        // central handle ring
-        ctx.fillStyle='#FFAB91';
-        ctx.beginPath();ctx.arc(cx,h-46,3,0,Math.PI*2);ctx.fill();ctx.stroke();
-        ctx.fillStyle='#FFFFFF';
-        ctx.beginPath();ctx.arc(cx,h-46,1.5,0,Math.PI*2);ctx.fill();
-        // teat poking up toward the mouth
-        ctx.fillStyle='#FFE0B2';
-        ctx.beginPath();ctx.ellipse(cx,h-51,3,3.5,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+         // (pacifier removed — baby only holds a bottle)
+         // Small smiling mouth
+         ctx.strokeStyle=C.black;ctx.lineWidth=1.2;ctx.lineCap='round';
+         ctx.beginPath();ctx.arc(cx,h-50,2.5,0,Math.PI);ctx.stroke();
         // Onesie body
         ctx.fillStyle=clr;
         ctx.beginPath();ctx.roundRect(cx-10,h-42,20,26,3);ctx.fill();
@@ -454,10 +543,7 @@ const OBS_DEFS=[
    w:110,h:86,
    desc:'Mannen delen belangrijke informatie over jobs, promoties en lonen onderling, op momenten en plaatsen waar vrouwen vaak niet bij zijn.',
    draw(w,h){
-     ctx.fillStyle='#4A148C'; ctx.fillRect(0,h-20,w,20);
-     ctx.strokeStyle='#311B92'; ctx.lineWidth=2; ctx.strokeRect(0,h-20,w,20);
-     ctx.fillStyle='#CE93D8'; ctx.font='bold 9px Space Grotesk,sans-serif'; ctx.textAlign='center';
-     ctx.fillText('GESLOTEN NETWERK',w/2,h-7);
+      // (no closed-network footer — just the three suited men)
      const drawSuit=(sx,hh)=>{
        ctx.fillStyle='#F5CBAA'; ctx.beginPath();ctx.arc(sx,hh-66,11,0,Math.PI*2);ctx.fill();
        ctx.strokeStyle='#333';ctx.lineWidth=1.5;ctx.stroke();
@@ -571,14 +657,238 @@ document.addEventListener('keydown',e=>{
   if(e.code==='ArrowDown'){e.preventDefault();duck(true);}
 });
 document.addEventListener('keyup',e=>{if(e.code==='ArrowDown')duck(false);});
-let ty=0;
-canvas.addEventListener('touchstart',e=>{ty=e.touches[0].clientY;},{passive:true});
+// Touch controls: swipe up/down or tap top/bottom half of screen
+let _tx=0,_ty=0,_tstart=0;
+canvas.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  _tx=e.touches[0].clientX;
+  _ty=e.touches[0].clientY;
+  _tstart=Date.now();
+},{passive:false});
 canvas.addEventListener('touchend',e=>{
-  const dy=ty-e.changedTouches[0].clientY;
-  if(dy>30)jump();else if(dy<-30){duck(true);setTimeout(()=>duck(false),460);}else jump();
-},{passive:true});
+  e.preventDefault();
+  const dx=e.changedTouches[0].clientX-_tx;
+  const dy=_ty-e.changedTouches[0].clientY; // positive = swipe up
+  const dt=Date.now()-_tstart;
+  const isTap=Math.abs(dx)<20&&Math.abs(dy)<20&&dt<220;
+  if(isTap){
+    // Tap: top half of canvas = jump, bottom half = duck
+    const rect=canvas.getBoundingClientRect();
+    const relY=(e.changedTouches[0].clientY-rect.top)/rect.height;
+    if(relY<0.5){jump();}
+    else{duck(true);setTimeout(()=>duck(false),460);}
+  } else if(Math.abs(dy)>Math.abs(dx)*0.6){
+    // Vertical swipe
+    if(dy>18)jump();
+    else if(dy<-18){duck(true);setTimeout(()=>duck(false),460);}
+  } else {
+    // Horizontal swipe or ambiguous — treat as jump
+    jump();
+  }
+},{passive:false});
 
 let running=false;
+
+// ── Suspenseful background music (Pink Panther–style sneaky walking bass) ────
+let audioCtx=null, musicTimer=null, musicGain=null;
+function midiHz(m){return 440*Math.pow(2,(m-69)/12);}
+
+// Music has 6 distinct sections for melodic variety — cycles through them
+// A: slinky chromatic walk (original theme)
+// B: sneaky high-note answer phrase
+// C: tension stabs — syncopated chromatic rises
+// D: descending bridge/resolution
+// E: minor-key swing bounce (upbeat feel)
+// F: chromatic climb with dramatic pause
+const MUSIC_SECTIONS=[
+  // === A: Slinky walk (home theme) ===
+  [
+    {n:52,d:0.25},{n:53,d:0.25},{n:55,d:0.25},{n:56,d:0.25},
+    {n:55,d:0.25},{n:53,d:0.25},{n:52,d:0.5},
+    {n:52,d:0.25},{n:53,d:0.25},{n:55,d:0.25},{n:56,d:0.25},
+    {n:58,d:0.5},{n:55,d:0.5},
+  ],
+  // === B: High melodic answer (upper register) ===
+  [
+    {n:64,d:0.25},{n:0,d:0.25},{n:63,d:0.25},{n:0,d:0.25},
+    {n:62,d:0.25},{n:60,d:0.25},{n:59,d:0.5},
+    {n:60,d:0.25},{n:0,d:0.25},{n:62,d:0.25},{n:0,d:0.25},
+    {n:64,d:0.5},{n:62,d:0.5},
+  ],
+  // === C: Tension stabs — syncopated ===
+  [
+    {n:52,d:0.125},{n:0,d:0.125},{n:55,d:0.125},{n:0,d:0.125},{n:56,d:0.25},{n:0,d:0.25},
+    {n:57,d:0.125},{n:0,d:0.125},{n:58,d:0.125},{n:0,d:0.125},{n:60,d:0.5},
+    {n:59,d:0.25},{n:58,d:0.25},{n:57,d:0.25},{n:56,d:0.25},
+    {n:55,d:0.5},{n:0,d:0.5},
+  ],
+  // === D: Descending bridge ===
+  [
+    {n:67,d:0.25},{n:65,d:0.25},{n:64,d:0.25},{n:62,d:0.25},
+    {n:60,d:0.5},{n:59,d:0.5},
+    {n:58,d:0.25},{n:56,d:0.25},{n:55,d:0.25},{n:53,d:0.25},
+    {n:52,d:1.0},
+  ],
+  // === E: Minor swing bounce — upbeat triplet feel ===
+  [
+    {n:52,d:0.17},{n:55,d:0.08},{n:56,d:0.25},
+    {n:55,d:0.17},{n:53,d:0.08},{n:52,d:0.25},
+    {n:51,d:0.17},{n:52,d:0.08},{n:55,d:0.5},
+    {n:56,d:0.17},{n:55,d:0.08},{n:53,d:0.17},{n:52,d:0.08},{n:51,d:0.5},
+    {n:48,d:0.25},{n:0,d:0.25},{n:52,d:0.25},{n:0,d:0.25},
+    {n:55,d:0.5},{n:56,d:0.5},
+  ],
+  // === F: Chromatic climb + dramatic pause ===
+  [
+    {n:48,d:0.25},{n:49,d:0.25},{n:50,d:0.25},{n:51,d:0.25},
+    {n:52,d:0.25},{n:53,d:0.25},{n:54,d:0.25},{n:55,d:0.25},
+    {n:56,d:0.25},{n:0,d:0.5},{n:0,d:0.25},
+    {n:60,d:0.25},{n:59,d:0.25},{n:57,d:0.25},{n:55,d:0.5},
+    {n:52,d:1.0},
+  ],
+];
+// Full arrangement: A A B A C D A E A F A — home theme recurs but surrounded by variety
+const SECTION_ORDER=[0,0,1,0,2,3,0,4,0,5,0];
+let _secIdx=0, _noteIdx=0;
+function _nextNote(){
+  const sec=MUSIC_SECTIONS[SECTION_ORDER[_secIdx%SECTION_ORDER.length]];
+  const note=sec[_noteIdx];
+  _noteIdx++;
+  if(_noteIdx>=sec.length){_noteIdx=0;_secIdx++;}
+  return note;
+}
+
+function startMusic(){
+  if(audioCtx)return;
+  _secIdx=0;_noteIdx=0;
+  try{
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    musicGain=audioCtx.createGain();
+    musicGain.gain.value=0.09;
+    musicGain.connect(audioCtx.destination);
+  }catch(e){return;}
+
+  const tempo=0.36;       // seconds per beat unit
+  const LOOKAHEAD=0.25;   // schedule this many seconds ahead
+  const INTERVAL=100;     // check every 100ms
+  let nextNoteTime=audioCtx.currentTime+0.05;
+
+  function scheduleNote(note, when){
+    if(note.n===0)return; // rest
+    const hz=midiHz(note.n);
+    const dur=note.d*tempo;
+
+    // Two detuned triangle waves for warmth
+    const o1=audioCtx.createOscillator();o1.type='triangle';o1.frequency.value=hz;
+    const o2=audioCtx.createOscillator();o2.type='triangle';o2.frequency.value=hz*1.0035;
+    // Sine sub one octave below
+    const o3=audioCtx.createOscillator();o3.type='sine';o3.frequency.value=hz*0.5;
+
+    // Single shared lowpass keeps things warm
+    const filt=audioCtx.createBiquadFilter();
+    filt.type='lowpass';filt.frequency.value=900;filt.Q.value=0.4;
+
+    // Main envelope — all exponential, no linear ramps (avoids clicks)
+    const g=audioCtx.createGain();
+    const atk=Math.min(0.04,dur*0.18);
+    const rel=Math.min(0.06,dur*0.25);
+    g.gain.setValueAtTime(0.0001,when);
+    g.gain.exponentialRampToValueAtTime(0.65,when+atk);
+    g.gain.setValueAtTime(0.65,when+dur-rel);
+    g.gain.exponentialRampToValueAtTime(0.0001,when+dur);
+
+    // Sub envelope
+    const sg=audioCtx.createGain();
+    sg.gain.setValueAtTime(0.0001,when);
+    sg.gain.exponentialRampToValueAtTime(0.28,when+atk+0.01);
+    sg.gain.exponentialRampToValueAtTime(0.0001,when+dur*0.85);
+
+    o1.connect(filt);o2.connect(filt);filt.connect(g);g.connect(musicGain);
+    o3.connect(sg);sg.connect(musicGain);
+
+    // Start + stop well within envelope so no audible click at boundaries
+    o1.start(when);o2.start(when);o3.start(when);
+    o1.stop(when+dur+0.05);o2.stop(when+dur+0.05);o3.stop(when+dur+0.05);
+  }
+
+  function scheduler(){
+    if(!audioCtx)return;
+    while(nextNoteTime<audioCtx.currentTime+LOOKAHEAD){
+      const note=_nextNote();
+      const dur=note.d*tempo;
+      scheduleNote(note,nextNoteTime);
+      nextNoteTime+=dur;
+    }
+    musicTimer=setTimeout(scheduler,INTERVAL);
+  }
+  scheduler();
+}
+function stopMusic(){if(musicTimer){clearTimeout(musicTimer);musicTimer=null;}if(audioCtx){try{audioCtx.close();}catch(e){}audioCtx=null;}}
+
+// ── Collision bump sound ───────────────────────────────────────────────────────
+function playCollisionSound(){
+  const ac=audioCtx||(()=>{try{return new(window.AudioContext||window.webkitAudioContext)();}catch(e){return null;}})();
+  if(!ac)return;
+  const t=ac.currentTime;
+  // Short percussive thud: filtered noise burst — louder
+  const bufLen=Math.floor(ac.sampleRate*0.15);
+  const buf=ac.createBuffer(1,bufLen,ac.sampleRate);
+  const data=buf.getChannelData(0);
+  for(let i=0;i<bufLen;i++)data[i]=(Math.random()*2-1)*Math.pow(1-i/bufLen,2.0);
+  const src=ac.createBufferSource();src.buffer=buf;
+  const filt=ac.createBiquadFilter();filt.type='bandpass';filt.frequency.value=200;filt.Q.value=0.8;
+  const gn=ac.createGain();gn.gain.setValueAtTime(1.4,t);gn.gain.exponentialRampToValueAtTime(0.001,t+0.15);
+  src.connect(filt);filt.connect(gn);gn.connect(ac.destination);
+  src.start(t);src.stop(t+0.16);
+  // Low sine thump — louder and longer
+  const o=ac.createOscillator();o.type='sine';
+  o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(35,t+0.13);
+  const g2=ac.createGain();g2.gain.setValueAtTime(1.2,t);g2.gain.exponentialRampToValueAtTime(0.001,t+0.13);
+  o.connect(g2);g2.connect(ac.destination);
+  o.start(t);o.stop(t+0.15);
+  // Extra mid-frequency crack for punch
+  const o2=ac.createOscillator();o2.type='square';
+  o2.frequency.setValueAtTime(280,t);o2.frequency.exponentialRampToValueAtTime(80,t+0.06);
+  const g3=ac.createGain();g3.gain.setValueAtTime(0.5,t);g3.gain.exponentialRampToValueAtTime(0.001,t+0.07);
+  o2.connect(g3);g3.connect(ac.destination);
+  o2.start(t);o2.stop(t+0.08);
+}
+
+// ── Victory fanfare ────────────────────────────────────────────────────────────
+function playVictoryMusic(){
+  let ac;
+  try{ac=new(window.AudioContext||window.webkitAudioContext)();}catch(e){return;}
+  const masterGain=ac.createGain();masterGain.gain.value=0.14;masterGain.connect(ac.destination);
+  // Triumphant C-major fanfare — rising arpeggio + melodic flourish
+  const fanfare=[
+    {n:60,d:0.12},{n:64,d:0.12},{n:67,d:0.12},{n:72,d:0.28},
+    {n:71,d:0.12},{n:72,d:0.28},{n:0,d:0.08},
+    {n:74,d:0.28},{n:72,d:0.12},{n:71,d:0.12},{n:69,d:0.12},
+    {n:72,d:0.55},{n:0,d:0.08},
+    {n:60,d:0.12},{n:64,d:0.12},{n:67,d:0.12},{n:72,d:0.12},{n:76,d:0.55},
+    {n:77,d:0.28},{n:76,d:0.12},{n:74,d:0.12},{n:72,d:0.7},
+  ];
+  const tempo=0.27;
+  let t=ac.currentTime+0.04;
+  for(const note of fanfare){
+    const dur=note.d*tempo;
+    if(note.n>0){
+      const o1=ac.createOscillator();o1.type='triangle';o1.frequency.value=midiHz(note.n);
+      const o2=ac.createOscillator();o2.type='sine';o2.frequency.value=midiHz(note.n-4);
+      const o3=ac.createOscillator();o3.type='sine';o3.frequency.value=midiHz(note.n-12);
+      const g=ac.createGain();
+      g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(1.0,t+0.025);
+      g.gain.setValueAtTime(1.0,t+dur*0.7);
+      g.gain.exponentialRampToValueAtTime(0.001,t+dur*1.1);
+      [o1,o2,o3].forEach(o=>{o.connect(g);o.start(t);o.stop(t+dur*1.15);});
+      g.connect(masterGain);
+    }
+    t+=dur;
+  }
+  setTimeout(()=>{try{ac.close();}catch(e){}},t*1000+600);
+}
+
 function startGame(){
   screen.style.display='none';gameState='playing';frame=0;speed=SPEED_START;lives=3;won=false;
   clockAngle=0;clockShake=0;clockTick=0;msgIndex=0;
@@ -586,7 +896,8 @@ function startGame(){
   prisonX=VW+30000;prisonVisible=false;
   rechargeTimer=0;rechargeFactTitle='';rechargeFactText='';invulnTimer=0;lastObsId=null;
   initBg();
-  if(!running)loop();
+  startMusic();
+  if(!running)startLoop();
 }
 
 function collides(o){
@@ -600,11 +911,12 @@ function triggerHit(o){
   const def=OBS_DEFS.find(d=>d.id===o.defId);
   lives--;
   o.active=false;
+  playCollisionSound();
   if(lives<=0){gameState='end';won=false;showEnd();return;}
   // Knock down avatar and start recharge
   av.downed=true; av.ducking=false; av.jumping=false; av.vy=0; av.y=GROUND;
-  av.hit=true; av.hitTimer=30;
-  rechargeTimer=RECHARGE_FRAMES;
+  av.hit=true; av.hitTimer=500;
+  rechargeTimer=RECHARGE_MS;
   rechargeFactTitle=def?def.label:'Wist je dat?';
   rechargeFactText=def?def.desc:'';
   gameState='recharging';
@@ -614,28 +926,32 @@ function triggerHit(o){
 
 function update(){
   if(gameState==='recharging'){
-    rechargeTimer--;
+    rechargeTimer-=TARGET_DT;
     clockShake=Math.max(0,clockShake-0.5);
     if(rechargeTimer<=0){
       gameState='playing';
       av.downed=false;
       av.hit=false;
-      invulnTimer=90; // ~1.5s
+      invulnTimer=1500; // 1.5s in ms
     }
     return;
   }
   if(gameState!=='playing')return;
   frame++;
   distancePx+=speed;
-  if(frame>1800)speed=Math.min(SPEED_MAX,SPEED_START+(frame-1800)/5000*(SPEED_MAX-SPEED_START));
+  // Speed ramp: based on distance, not frames — same at any FPS
+  if(distancePx>10800)speed=Math.min(SPEED_MAX,SPEED_START+(distancePx-10800)/180000*(SPEED_MAX-SPEED_START));
   av.legPhase+=av.jumping?0.09:0.24;
   if(av.jumping||av.y<GROUND){av.vy+=GRAVITY;av.y+=av.vy;if(av.y>=GROUND){av.y=GROUND;av.jumping=false;av.vy=0;}}
-  if(invulnTimer>0)invulnTimer--;
-  if(av.hit){av.hitTimer--;if(av.hitTimer<=0)av.hit=false;clockShake=8;clockAngle-=0.05;}
+  if(invulnTimer>0)invulnTimer-=TARGET_DT;
+  if(av.hit){av.hitTimer-=TARGET_DT;if(av.hitTimer<=0)av.hit=false;clockShake=8;clockAngle-=0.05;}
   else clockShake=Math.max(0,clockShake-0.7);
   if(clockTick>0){clockAngle+=0.04;clockTick--;}
-  if(frame%140===0)trySpawnObstacle();
-  if(frame%280===0)spawnStar();
+  // Spawn obstacles and stars based on distance, not frame count
+  const SPAWN_INTERVAL=840; // pixels between spawn checks (~140 frames × 6px/frame)
+  const STAR_INTERVAL=1680;
+  if(!prisonVisible&&Math.floor(distancePx/SPAWN_INTERVAL)>Math.floor((distancePx-speed)/SPAWN_INTERVAL))trySpawnObstacle();
+  if(Math.floor(distancePx/STAR_INTERVAL)>Math.floor((distancePx-speed)/STAR_INTERVAL))spawnStar();
 
   for(const tr of TRANSITIONS){
     if(distancePx>=tr.px&&distancePx<tr.px+speed*2&&currentThemeIdx<tr.toTheme){
@@ -669,8 +985,8 @@ function update(){
   for(let m of gMarks){m.x-=speed;if(m.x<-130)m.x+=3650;}
   for(let s of stars){s.x-=speed*0.1;s.y+=s.vy;if(s.x<-10)s.x=VW+10;}
   prisonX-=speed;
-  if(prisonX<VW+360)prisonVisible=true;
-  if(prisonX<av.x+18&&prisonVisible){won=true;gameState='end';showEnd();}
+  if(prisonX<VW+360){if(!prisonVisible){obstacles=[];}prisonVisible=true;}
+  if(prisonX<av.x+18&&prisonVisible){won=true;gameState='end';stopMusic();playVictoryMusic();showEnd();}
 }
 
 // ── DRAW HELPERS ─────────────────────────────────────────────────────────────
@@ -742,7 +1058,7 @@ function drawDownedAvatar(){
   ctx.beginPath();ctx.moveTo(-20,-8);ctx.lineTo(-38,-14);ctx.stroke();
   ctx.beginPath();ctx.moveTo(-22,-12);ctx.lineTo(-40,-2);ctx.stroke();
   // little stars above head
-  const t=Math.floor((RECHARGE_FRAMES-rechargeTimer)/10)%3;
+  const t=Math.floor((RECHARGE_MS-rechargeTimer)/167)%3;
   ctx.fillStyle='#FFD54F';ctx.font='bold 14px Space Grotesk,sans-serif';ctx.textAlign='center';
   ctx.fillText(['✦','✧','★'][t],34,-38);
   ctx.fillText(['✧','★','✦'][t],46,-32);
@@ -754,7 +1070,7 @@ function drawDownedAvatar(){
 function drawAvatar(){
   if(av.downed){drawDownedAvatar();return;}
   ctx.save();ctx.translate(av.x,av.y);
-  if((av.hit||invulnTimer>0)&&Math.floor(frame/5)%2===0)ctx.globalAlpha=0.4;
+  if((av.hit||invulnTimer>0)&&Math.floor(Date.now()/83)%2===0)ctx.globalAlpha=0.4;
   if(!av.ducking){
     const sw=Math.sin(av.legPhase);
     // Jeans legs (denim blue)
@@ -783,29 +1099,27 @@ function drawAvatar(){
     ctx.fillStyle=C.red;ctx.strokeStyle=C.black;ctx.lineWidth=1.6;
     ctx.beginPath();ctx.arc(-22+sw*10,-14,7,0,Math.PI*2);ctx.fill();ctx.stroke();
     ctx.beginPath();ctx.arc(22-sw*10,-14,7,0,Math.PI*2);ctx.fill();ctx.stroke();
-    // Neck
-    ctx.fillStyle='#F5CBAA';ctx.fillRect(-4,-58,8,10);
+    // Neck (red — no skin visible)
+    ctx.fillStyle=C.red;ctx.fillRect(-5,-58,10,12);
     // Head
     ctx.fillStyle='#F5CBAA';ctx.beginPath();ctx.arc(0,-72,16,0,Math.PI*2);ctx.fill();
     ctx.strokeStyle=C.black;ctx.lineWidth=1.8;ctx.stroke();
-    // Messy black curls — round overlapping blobs only, no braids
+    // One big messy curl ball covering the whole head (no strands, no braids)
     ctx.fillStyle=C.black;
-    ctx.beginPath();ctx.ellipse(0,-82,21,11,0,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(-12,-84,8,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(9,-86,9,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(-2,-90,8,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(14,-82,8,0,Math.PI*2);ctx.fill();
-    // Curls hanging over the face
-    ctx.beginPath();ctx.arc(-13,-74,9,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(-4,-70,10,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(6,-72,10,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(14,-74,8,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(-10,-64,7,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(2,-62,8,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(12,-64,7,0,Math.PI*2);ctx.fill();
-    // Side curls down to jaw (round blobs, not braids)
-    ctx.beginPath();ctx.arc(-15,-60,6,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(15,-60,6,0,Math.PI*2);ctx.fill();
+    // main dome
+    ctx.beginPath();ctx.ellipse(0,-78,22,18,0,0,Math.PI*2);ctx.fill();
+    // overlapping random curl blobs to make it look messy
+    ctx.beginPath();ctx.arc(-14,-84,9,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(-2,-92,10,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(10,-90,9,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(17,-80,8,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(-18,-76,8,0,Math.PI*2);ctx.fill();
+    // curls covering the face
+    ctx.beginPath();ctx.arc(-10,-70,10,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(0,-66,11,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(11,-70,10,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(-6,-60,8,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(6,-60,8,0,Math.PI*2);ctx.fill();
   } else {
     // Ducking: t-shirt blob + jeans
     ctx.fillStyle=C.red;
@@ -1027,7 +1341,7 @@ function drawRechargeModal(){
 
   // loading bar
   const barW=mw-60, barH=18, barX=mx+30, barY=my+mh-46;
-  const pct=1-(rechargeTimer/RECHARGE_FRAMES);
+  const pct=1-(rechargeTimer/RECHARGE_MS);
   ctx.fillStyle='#EEE';
   ctx.beginPath();ctx.roundRect(barX,barY,barW,barH,9);ctx.fill();
   ctx.fillStyle=C.red;
@@ -1035,7 +1349,7 @@ function drawRechargeModal(){
   ctx.strokeStyle=C.black;ctx.lineWidth=2;
   ctx.beginPath();ctx.roundRect(barX,barY,barW,barH,9);ctx.stroke();
   // seconds remaining
-  const sec=Math.ceil(rechargeTimer/60);
+  const sec=Math.ceil(rechargeTimer/1000);
   ctx.fillStyle=C.black;ctx.font='bold 13px Space Grotesk,sans-serif';ctx.textAlign='center';
   ctx.fillText('Herladen… '+sec+'s',VW/2,barY+barH+22);
   ctx.textAlign='left';
@@ -1058,16 +1372,28 @@ function draw(){
   for(let b of billboards){
     if(b.x>-320&&b.x<VW+200){
       const by=GROUND-195;
-      ctx.fillStyle=theme.accentColor;ctx.fillRect(b.x,by,b.w,b.h);
-      ctx.strokeStyle=C.black;ctx.lineWidth=2.5;ctx.strokeRect(b.x,by,b.w,b.h);
-      ctx.fillStyle=C.white;ctx.font='bold 14px Space Grotesk,sans-serif';ctx.textAlign='center';
-      const words=b.msg.split(' ');let line='',lines=[],mw=b.w-20;
+      const positive=!!b.msg.positive;
+      // Positive billboards: bright steady yellow. Negative: dark grey panel.
+      let bgCol, textCol, borderCol;
+      if(positive){
+        bgCol='#FFD54F';     // steady warm yellow
+        textCol='#1A1A1A';
+        borderCol='#F57C00';
+      } else {
+        bgCol='#3A3A3A';     // dark grey
+        textCol='#E0E0E0';
+        borderCol='#1A1A1A';
+      }
+      ctx.fillStyle=bgCol;ctx.fillRect(b.x,by,b.w,b.h);
+      ctx.strokeStyle=borderCol;ctx.lineWidth=2.5;ctx.strokeRect(b.x,by,b.w,b.h);
+      ctx.fillStyle=textCol;ctx.font='bold 14px Space Grotesk,sans-serif';ctx.textAlign='center';
+      const words=b.msg.text.split(' ');let line='',lines=[],mw=b.w-20;
       for(let w of words){const t=line+w+' ';if(ctx.measureText(t).width>mw&&line){lines.push(line.trim());line=w+' ';}else line=t;}
       if(line)lines.push(line.trim());
       const lh=20,sy2=by+b.h/2-(lines.length-1)*lh/2+6;
       lines.forEach((l,i)=>ctx.fillText(l,b.x+b.w/2,sy2+i*lh));
       ctx.textAlign='left';
-      ctx.strokeStyle=C.black;ctx.lineWidth=2;
+      ctx.strokeStyle='#1A1A1A';ctx.lineWidth=2;
       ctx.beginPath();ctx.moveTo(b.x+b.w/2,by+b.h);ctx.lineTo(b.x+b.w/2,GROUND-100);ctx.stroke();
     }
   }
@@ -1083,23 +1409,45 @@ function draw(){
   drawRechargeModal();
 
   ctx.fillStyle='rgba(26,26,26,0.45)';ctx.font='12px Space Grotesk,sans-serif';ctx.textAlign='center';
-  ctx.fillText('↑ springen   ↓ bukken   (swipe op mobiel)',VW/2,VH-10);
+  const isMobile='ontouchstart' in window;
+  ctx.fillText(isMobile?'Tap boven = springen  ·  Tap onder = bukken  ·  of swipe':'↑ springen   ↓ bukken',VW/2,VH-10);
   ctx.textAlign='left';
 }
 
-function loop(){running=true;update();draw();if(gameState==='playing'||gameState==='recharging')requestAnimationFrame(loop);else running=false;}
+// Delta-time game loop
+let _lastTs=0,_dtAccum=0;
+const MAX_STEPS=4;
+function loop(ts){
+  running=true;
+  const raw=ts-_lastTs; _lastTs=ts;
+  const dt=Math.min(raw||TARGET_DT, TARGET_DT*MAX_STEPS);
+  _dtAccum+=dt;
+  let steps=0;
+  while(_dtAccum>=TARGET_DT && steps<MAX_STEPS){update();_dtAccum-=TARGET_DT;steps++;}
+  draw();
+  if(gameState==='playing'||gameState==='recharging')requestAnimationFrame(loop);
+  else running=false;
+}
+function startLoop(){
+  if(running)return;
+  _lastTs=performance.now();
+  _dtAccum=0;
+  requestAnimationFrame(loop);
+}
 
 function showEnd(){
+  stopMusic();
   screen.innerHTML='';screen.style.display='flex';
   const t=document.createElement('div');t.id='endTitle';
   const s=document.createElement('div');s.id='endSub';
   const c=document.createElement('div');c.id='copyMsg';
+  const linkHTML='<a href="https://www.zijkant.be/economische-macht/unequal-pay-day/" target="_blank" rel="noopener" style="color:#CC0000;font-weight:700;text-decoration:underline;">unequalpayday.be</a>';
   if(won){
     t.textContent='Proficiat, jij krijgt equal pay!';
-    s.innerHTML='Dicht ook de loonkloof in het echte leven via <strong>unequalpayday.be</strong>';
+    s.innerHTML='Dicht ook de loonkloof in het echte leven via '+linkHTML;
   } else {
     t.textContent='Jammer, jij haalde de Equal Pay Run niet en krijgt dus geen gelijk loon.';
-    s.innerHTML='Je bent niet alleen. Dicht de loonkloof op <strong>unequalpayday.be</strong>';
+    s.innerHTML='Je bent niet alleen. Dicht de loonkloof op '+linkHTML;
   }
   const shareB=document.createElement('button');shareB.className='btn';shareB.textContent='Deel dit spel';
   shareB.addEventListener('click',()=>{
