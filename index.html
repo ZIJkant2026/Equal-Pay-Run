@@ -658,21 +658,27 @@ document.addEventListener('keydown',e=>{
   if(e.code==='ArrowDown'){e.preventDefault();duck(true);}
 });
 document.addEventListener('keyup',e=>{if(e.code==='ArrowDown')duck(false);});
-// Touch controls — listen on document so we catch all touches, react on touchstart for instant response
+// Touch controls — only active during gameplay, so buttons on start/end screens work normally
 let _tx=0,_ty=0,_tMoved=false,_duckTimer=null;
+function _gameActive(){return gameState==='playing'||gameState==='recharging';}
+
+// Resume AudioContext on ANY touch anywhere (iOS requires user gesture)
 document.addEventListener('touchstart',e=>{
-  // Resume AudioContext on first touch (iOS requirement)
   if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
+},{passive:true});
+
+canvas.addEventListener('touchstart',e=>{
+  if(!_gameActive())return;
   e.preventDefault();
   const t=e.touches[0];
   _tx=t.clientX; _ty=t.clientY; _tMoved=false;
 },{passive:false});
-document.addEventListener('touchmove',e=>{
+canvas.addEventListener('touchmove',e=>{
+  if(!_gameActive())return;
   e.preventDefault();
   if(e.touches.length===0)return;
-  const dx=e.touches[0].clientX-_tx;
   const dy=_ty-e.touches[0].clientY; // positive = swipe up
-  if(Math.abs(dy)>28&&!_tMoved){
+  if(Math.abs(dy)>22&&!_tMoved){
     _tMoved=true;
     if(dy>0){jump();}
     else{
@@ -682,10 +688,11 @@ document.addEventListener('touchmove',e=>{
     }
   }
 },{passive:false});
-document.addEventListener('touchend',e=>{
+canvas.addEventListener('touchend',e=>{
+  if(!_gameActive())return;
   e.preventDefault();
-  if(_tMoved)return; // already handled in touchmove
-  // Tap: split screen top=jump, bottom=duck
+  if(_tMoved)return;
+  // Tap: top 55% = jump, bottom 45% = duck
   const rect=canvas.getBoundingClientRect();
   const relY=(e.changedTouches[0].clientY-rect.top)/rect.height;
   if(relY<0.55){jump();}
