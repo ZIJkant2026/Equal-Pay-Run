@@ -664,11 +664,14 @@ let _tx=0,_ty=0,_tMoved=false,_duckTimer=null;
 document.addEventListener('touchstart',e=>{
   // Resume AudioContext on first touch (iOS requirement)
   if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
+  // Don't hijack touches on buttons/links (start, replay, share) — let them click normally
+  if(e.target.closest('button,a')){_tMoved=true;return;}
   e.preventDefault();
   const t=e.touches[0];
   _tx=t.clientX; _ty=t.clientY; _tMoved=false;
 },{passive:false});
 document.addEventListener('touchmove',e=>{
+  if(e.target.closest('button,a'))return;
   e.preventDefault();
   if(e.touches.length===0)return;
   const dx=e.touches[0].clientX-_tx;
@@ -684,6 +687,7 @@ document.addEventListener('touchmove',e=>{
   }
 },{passive:false});
 document.addEventListener('touchend',e=>{
+  if(e.target.closest('button,a'))return;
   e.preventDefault();
   if(_tMoved)return; // already handled in touchmove
   // Tap: split screen top=jump, bottom=duck
