@@ -660,8 +660,9 @@ document.addEventListener('keydown',e=>{
 });
 document.addEventListener('keyup',e=>{if(e.code==='ArrowDown')duck(false);});
 // Touch controls — listen on document so we catch all touches, react on touchstart for instant response
-let _tx=0,_ty=0,_tMoved=false,_duckTimer=null,_duckActive=false;
-const DUCK_RELEASE_BUFFER=150; // ms grace after releasing finger, so a duck doesn't pop up mid-obstacle
+let _tx=0,_ty=0,_tMoved=false,_duckTimer=null,_duckActive=false,_duckMinUntil=0;
+const DUCK_MIN_MS=650; // guaranteed minimum duck duration for a quick swipe, even if finger lifts instantly
+const DUCK_RELEASE_BUFFER=150; // extra grace after releasing finger, so a held duck doesn't pop up mid-obstacle
 document.addEventListener('touchstart',e=>{
   // Resume AudioContext on first touch (iOS requirement)
   if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
@@ -684,6 +685,7 @@ document.addEventListener('touchmove',e=>{
       if(_duckTimer){clearTimeout(_duckTimer);_duckTimer=null;}
       duck(true);
       _duckActive=true;
+      _duckMinUntil=Date.now()+DUCK_MIN_MS;
     }
   }
 },{passive:false});
@@ -692,20 +694,20 @@ document.addEventListener('touchend',e=>{
   e.preventDefault();
   if(_duckActive){
     _duckActive=false;
-    // small buffer before standing back up, so we don't pop up mid-obstacle on release
+    const remaining=_duckMinUntil-Date.now();
     if(_duckTimer)clearTimeout(_duckTimer);
-    _duckTimer=setTimeout(()=>duck(false),DUCK_RELEASE_BUFFER);
+    _duckTimer=setTimeout(()=>duck(false),Math.max(remaining,0)+DUCK_RELEASE_BUFFER);
     return;
   }
   if(_tMoved)return; // already handled in touchmove (swipe jump)
-  // Tap: split screen top=jump, bottom=duck-hold while finger stays down
+  // Tap: split screen top=jump, bottom=duck
   const rect=canvas.getBoundingClientRect();
   const relY=(e.changedTouches[0].clientY-rect.top)/rect.height;
   if(relY<0.55){jump();}
   else{
     if(_duckTimer)clearTimeout(_duckTimer);
     duck(true);
-    _duckTimer=setTimeout(()=>duck(false),600);
+    _duckTimer=setTimeout(()=>duck(false),DUCK_MIN_MS);
   }
 },{passive:false});
 
