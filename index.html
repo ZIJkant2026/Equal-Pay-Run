@@ -660,7 +660,7 @@ document.addEventListener('keydown',e=>{
 });
 document.addEventListener('keyup',e=>{if(e.code==='ArrowDown')duck(false);});
 // Touch controls — listen on document so we catch all touches, react on touchstart for instant response
-let _tx=0,_ty=0,_tMoved=false,_duckTimer=null,_duckHeld=false;
+let _tx=0,_ty=0,_tMoved=false,_duckTimer=null,_duckActive=false;
 const DUCK_RELEASE_BUFFER=150; // ms grace after releasing finger, so a duck doesn't pop up mid-obstacle
 document.addEventListener('touchstart',e=>{
   // Resume AudioContext on first touch (iOS requirement)
@@ -670,14 +670,6 @@ document.addEventListener('touchstart',e=>{
   e.preventDefault();
   const t=e.touches[0];
   _tx=t.clientX; _ty=t.clientY; _tMoved=false;
-  // Bottom-half touch: start ducking immediately and keep ducking for as long as the finger is held
-  const rect=canvas.getBoundingClientRect();
-  const relY=(t.clientY-rect.top)/rect.height;
-  if(relY>=0.55){
-    if(_duckTimer){clearTimeout(_duckTimer);_duckTimer=null;}
-    duck(true);
-    _duckHeld=true;
-  }
 },{passive:false});
 document.addEventListener('touchmove',e=>{
   if(e.target.closest('button,a'))return;
@@ -687,38 +679,33 @@ document.addEventListener('touchmove',e=>{
   const dy=_ty-e.touches[0].clientY; // positive = swipe up
   if(Math.abs(dy)>28&&!_tMoved){
     _tMoved=true;
-    if(dy>0){
-      // Upward swipe always means jump, even if the gesture started low (duck-hold) on screen
-      if(_duckHeld){
-        _duckHeld=false;
-        if(_duckTimer){clearTimeout(_duckTimer);_duckTimer=null;}
-        duck(false);
-      }
-      jump();
+    if(dy>0){jump();}
+    else{
+      if(_duckTimer){clearTimeout(_duckTimer);_duckTimer=null;}
+      duck(true);
+      _duckActive=true;
     }
   }
 },{passive:false});
 document.addEventListener('touchend',e=>{
   if(e.target.closest('button,a'))return;
   e.preventDefault();
-  if(_duckHeld){
-    _duckHeld=false;
+  if(_duckActive){
+    _duckActive=false;
     // small buffer before standing back up, so we don't pop up mid-obstacle on release
     if(_duckTimer)clearTimeout(_duckTimer);
     _duckTimer=setTimeout(()=>duck(false),DUCK_RELEASE_BUFFER);
     return;
   }
   if(_tMoved)return; // already handled in touchmove (swipe jump)
-  // Quick tap, top half = jump (bottom-half taps are already handled as duck-hold in touchstart)
+  // Tap: split screen top=jump, bottom=duck-hold while finger stays down
   const rect=canvas.getBoundingClientRect();
   const relY=(e.changedTouches[0].clientY-rect.top)/rect.height;
   if(relY<0.55){jump();}
-},{passive:false});
-document.addEventListener('touchcancel',e=>{
-  if(_duckHeld){
-    _duckHeld=false;
+  else{
     if(_duckTimer)clearTimeout(_duckTimer);
-    _duckTimer=setTimeout(()=>duck(false),DUCK_RELEASE_BUFFER);
+    duck(true);
+    _duckTimer=setTimeout(()=>duck(false),600);
   }
 },{passive:false});
 
