@@ -687,7 +687,15 @@ document.addEventListener('touchmove',e=>{
   const dy=_ty-e.touches[0].clientY; // positive = swipe up
   if(Math.abs(dy)>28&&!_tMoved){
     _tMoved=true;
-    if(dy>0&&!_duckHeld){jump();}
+    if(dy>0){
+      // Upward swipe always means jump, even if the gesture started low (duck-hold) on screen
+      if(_duckHeld){
+        _duckHeld=false;
+        if(_duckTimer){clearTimeout(_duckTimer);_duckTimer=null;}
+        duck(false);
+      }
+      jump();
+    }
   }
 },{passive:false});
 document.addEventListener('touchend',e=>{
