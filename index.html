@@ -661,6 +661,7 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('keyup',e=>{if(e.code==='ArrowDown')duck(false);});
 // Touch controls — listen on document so we catch all touches, react on touchstart for instant response
 let _tx=0,_ty=0,_tMoved=false,_duckTimer=null,_duckActive=false,_duckMinUntil=0;
+const SWIPE_THRESHOLD=15; // px — low enough that short downward swipes high on screen still register
 const DUCK_MIN_MS=650; // guaranteed minimum duck duration for a quick swipe, even if finger lifts instantly
 const DUCK_RELEASE_BUFFER=150; // extra grace after releasing finger, so a held duck doesn't pop up mid-obstacle
 document.addEventListener('touchstart',e=>{
@@ -678,7 +679,7 @@ document.addEventListener('touchmove',e=>{
   if(e.touches.length===0)return;
   const dx=e.touches[0].clientX-_tx;
   const dy=_ty-e.touches[0].clientY; // positive = swipe up
-  if(Math.abs(dy)>28&&!_tMoved){
+  if(Math.abs(dy)>SWIPE_THRESHOLD&&!_tMoved){
     _tMoved=true;
     if(dy>0){jump();}
     else{
@@ -700,7 +701,18 @@ document.addEventListener('touchend',e=>{
     return;
   }
   if(_tMoved)return; // already handled in touchmove (swipe jump)
-  // Tap: split screen top=jump, bottom=duck
+  // No clear swipe registered — decide by net vertical movement first, then fall back to tap position
+  const dyFinal=_ty-e.changedTouches[0].clientY; // positive = moved up
+  if(Math.abs(dyFinal)>6){
+    if(dyFinal>0){jump();}
+    else{
+      if(_duckTimer)clearTimeout(_duckTimer);
+      duck(true);
+      _duckTimer=setTimeout(()=>duck(false),DUCK_MIN_MS);
+    }
+    return;
+  }
+  // True tap (negligible movement): split screen top=jump, bottom=duck
   const rect=canvas.getBoundingClientRect();
   const relY=(e.changedTouches[0].clientY-rect.top)/rect.height;
   if(relY<0.55){jump();}
