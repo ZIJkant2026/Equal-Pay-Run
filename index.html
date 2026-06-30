@@ -79,7 +79,7 @@ const TRANSITIONS=[
 ];
 
 const MSGS=[
-  {text:'Voor elke euro die een man verdient krijgt een vrouw 80 cent', positive:false},
+  {text:'Voor elke euro die een man verdient krijgt een vrouw 80 cent.', positive:false},
   {text:'Mensen praten liever over seks dan over hun loon.', positive:false},
   {text:'Betrokken papa\u2019s dichten mee de loonkloof.', positive:true},
   {text:'Vrouwen hebben 21 procent minder pensioen.', positive:false},
@@ -140,7 +140,7 @@ const OBS_DEFS=[
 
   // Sticky floor: tar puddle — jump
   {id:'stickyfloor',label:'Sticky floor',action:'jump',theme:'carriere',
-   w:110,h:30,
+   w:90,h:30,
    desc:'Vrouwen hebben de helft minder kans dan mannen om uitgenodigd te worden op een sollicitatiegesprek voor een hogere functie dan de huidige functie.',
    draw(w,h){
      ctx.fillStyle='#1A1A1A';
@@ -242,7 +242,7 @@ const OBS_DEFS=[
 
   // Vrouwen- en mannenjobs: balance scale with nurse vs tech worker — jump
   {id:'genderjobs',label:'Vrouwen- en mannenjobs',action:'jump',theme:'carriere',
-   w:130,h:96,
+   w:100,h:96,
    desc:'Veel vrouwen werken in de zorg. Deze jobs betalen slechter dan jobs in tech, wetenschappen of de industrie (waar vooral mannen werken).',
    draw(w,h){
      const cx=w/2, baseY=h-4;
@@ -333,7 +333,7 @@ const OBS_DEFS=[
 
   // Moederschapsstraf: 2 toddlers — jump
   {id:'kinderen',label:'Moederschapsstraf',action:'jump',theme:'gezin',
-   w:100,h:80,
+   w:82,h:80,
    desc:'Werkgevers zien (potentiële) moeders liever niet komen. Zij worden gezien als minder ambitieus, minder flexibel en vaker afwezig.',
    draw(w,h){
       const drawKid=(cx,clr,skin)=>{
@@ -445,7 +445,7 @@ const OBS_DEFS=[
 
   // Deeltijds werk signpost — jump
   {id:'parttime',label:'Deeltijds werk',action:'jump',theme:'gezin',
-   w:110,h:78,
+   w:90,h:78,
    desc:'Bijna de helft van de vrouwen werkt deeltijds, tegenover één op de tien mannen. Dat doen ze vooral om voor kinderen of andere personen te zorgen. Ook zorgverloven worden hoofdzakelijk door vrouwen opgenomen.',
    draw(w,h){
      // Pole
@@ -541,7 +541,7 @@ const OBS_DEFS=[
 
   // Good old boys network — jump
   {id:'gobn_cultuur',label:'Old boys network',action:'jump',theme:'cultuur',
-   w:110,h:86,
+   w:90,h:86,
    desc:'Mannen delen belangrijke informatie over jobs, promoties en lonen onderling, op momenten en plaatsen waar vrouwen vaak niet bij zijn.',
    draw(w,h){
       // (no closed-network footer — just the three suited men)
@@ -566,7 +566,7 @@ const OBS_DEFS=[
 
   // Work-family conflict — jump
   {id:'workfamily_cultuur',label:'Work-family conflict',action:'jump',theme:'cultuur',
-   w:100,h:84,
+   w:84,h:84,
    desc:'In veel sectoren worden werknemers beloond voor overuren en permanente beschikbaarheid, maar vrouwen kunnen hier minder aan voldoen door hun grotere aandeel in het huishouden.',
    draw(w,h){
      ctx.fillStyle='#FF8A65';
@@ -602,7 +602,7 @@ const OBS_DEFS=[
 const av={x:160,y:GROUND,vy:0,jumping:false,ducking:false,hit:false,hitTimer:0,legPhase:0,downed:false};
 function avH(){return av.ducking?AV_H_DUCK:AV_H_STAND;}
 
-let gameState='idle',frame=0,speed=SPEED_START,lives=3,won=false;
+let gameState='idle',frame=0,speed=SPEED_START,lives=5,won=false;
 let clockAngle=0,clockShake=0,clockTick=0,msgIndex=0;
 let distancePx=0,currentThemeIdx=0,transitionBanner=null;
 let obstacles=[],billboards=[],bgB=[],fgB=[],gMarks=[],stars=[];
@@ -615,8 +615,9 @@ let invulnTimer=0; // brief invulnerability after recharge
 function getTheme(){return THEMES[currentThemeIdx];}
 
 function initBg(){
-  bgB=[];for(let i=0;i<14;i++)bgB.push({x:i*180+Math.random()*60,w:60+Math.random()*80,h:80+Math.random()*110});
-  fgB=[];for(let i=0;i<10;i++)fgB.push({x:i*200+Math.random()*80,w:80+Math.random()*100,h:100+Math.random()*130,win:Math.random()>0.3});
+  const bgCount=IS_MOBILE?7:14, fgCount=IS_MOBILE?5:10;
+  bgB=[];for(let i=0;i<bgCount;i++)bgB.push({x:i*180+Math.random()*60,w:60+Math.random()*80,h:80+Math.random()*110});
+  fgB=[];for(let i=0;i<fgCount;i++)fgB.push({x:i*200+Math.random()*80,w:80+Math.random()*100,h:100+Math.random()*130,win:Math.random()>0.3});
   gMarks=[];for(let i=0;i<30;i++)gMarks.push({x:i*120});
   billboards=[];
   const billSpacing=1400;
@@ -658,27 +659,21 @@ document.addEventListener('keydown',e=>{
   if(e.code==='ArrowDown'){e.preventDefault();duck(true);}
 });
 document.addEventListener('keyup',e=>{if(e.code==='ArrowDown')duck(false);});
-// Touch controls — only active during gameplay, so buttons on start/end screens work normally
+// Touch controls — listen on document so we catch all touches, react on touchstart for instant response
 let _tx=0,_ty=0,_tMoved=false,_duckTimer=null;
-function _gameActive(){return gameState==='playing'||gameState==='recharging';}
-
-// Resume AudioContext on ANY touch anywhere (iOS requires user gesture)
 document.addEventListener('touchstart',e=>{
+  // Resume AudioContext on first touch (iOS requirement)
   if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
-},{passive:true});
-
-canvas.addEventListener('touchstart',e=>{
-  if(!_gameActive())return;
   e.preventDefault();
   const t=e.touches[0];
   _tx=t.clientX; _ty=t.clientY; _tMoved=false;
 },{passive:false});
-canvas.addEventListener('touchmove',e=>{
-  if(!_gameActive())return;
+document.addEventListener('touchmove',e=>{
   e.preventDefault();
   if(e.touches.length===0)return;
+  const dx=e.touches[0].clientX-_tx;
   const dy=_ty-e.touches[0].clientY; // positive = swipe up
-  if(Math.abs(dy)>22&&!_tMoved){
+  if(Math.abs(dy)>28&&!_tMoved){
     _tMoved=true;
     if(dy>0){jump();}
     else{
@@ -688,11 +683,10 @@ canvas.addEventListener('touchmove',e=>{
     }
   }
 },{passive:false});
-canvas.addEventListener('touchend',e=>{
-  if(!_gameActive())return;
+document.addEventListener('touchend',e=>{
   e.preventDefault();
-  if(_tMoved)return;
-  // Tap: top 55% = jump, bottom 45% = duck
+  if(_tMoved)return; // already handled in touchmove
+  // Tap: split screen top=jump, bottom=duck
   const rect=canvas.getBoundingClientRect();
   const relY=(e.changedTouches[0].clientY-rect.top)/rect.height;
   if(relY<0.55){jump();}
@@ -912,7 +906,7 @@ function playVictoryMusic(){
 }
 
 function startGame(){
-  screen.style.display='none';gameState='playing';frame=0;speed=SPEED_START;lives=3;won=false;
+  screen.style.display='none';gameState='playing';frame=0;speed=SPEED_START;lives=5;won=false;
   clockAngle=0;clockShake=0;clockTick=0;msgIndex=0;
   av.x=160;av.y=GROUND;av.vy=0;av.jumping=false;av.ducking=false;av.hit=false;av.hitTimer=0;av.legPhase=0;av.downed=false;
   prisonX=VW+30000;prisonVisible=false;
@@ -972,7 +966,7 @@ function update(){
   // Spawn obstacles and stars based on distance, not frame count
   const SPAWN_INTERVAL=840; // pixels between spawn checks (~140 frames × 6px/frame)
   const STAR_INTERVAL=1680;
-  if(!prisonVisible&&Math.floor(distancePx/SPAWN_INTERVAL)>Math.floor((distancePx-speed)/SPAWN_INTERVAL))trySpawnObstacle();
+  if(Math.floor(distancePx/SPAWN_INTERVAL)>Math.floor((distancePx-speed)/SPAWN_INTERVAL))trySpawnObstacle();
   if(Math.floor(distancePx/STAR_INTERVAL)>Math.floor((distancePx-speed)/STAR_INTERVAL))spawnStar();
   // Cap star count to reduce draw calls (mobile performance)
   if(stars.length>12)stars.splice(0,stars.length-12);
@@ -1009,7 +1003,7 @@ function update(){
   for(let m of gMarks){m.x-=speed;if(m.x<-130)m.x+=3650;}
   for(let s of stars){s.x-=speed*0.1;s.y+=s.vy;if(s.x<-10)s.x=VW+10;}
   prisonX-=speed;
-  if(prisonX<VW+360){if(!prisonVisible){obstacles=[];}prisonVisible=true;}
+  if(prisonX<VW+360){prisonVisible=true;}
   if(prisonX<av.x+18&&prisonVisible){won=true;gameState='end';stopMusic();playVictoryMusic();showEnd();}
 }
 
@@ -1324,9 +1318,9 @@ function drawHUD(){
   }
 
   ctx.fillStyle=C.black;ctx.font='bold 13px Space Grotesk,sans-serif';ctx.textAlign='right';
-  ctx.fillText('Levens:',VW-136,32);
-  for(let i=0;i<3;i++){
-    drawSmallClock(VW-106+i*32,26,i<lives);
+  ctx.fillText('Levens:',VW-166,32);
+  for(let i=0;i<5;i++){
+    drawSmallClock(VW-136+i*28,26,i<lives);
   }
   ctx.textAlign='left';
 }
@@ -1385,12 +1379,12 @@ function draw(){
   ctx.fillStyle=theme.bgColor;
   ctx.fillRect(0,HUD_H,VW,VH-HUD_H);
 
-  for(let s of stars){ctx.fillStyle=theme.accentColor;ctx.globalAlpha=0.07;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;}
+  if(!IS_MOBILE)for(let s of stars){ctx.fillStyle=theme.accentColor;ctx.globalAlpha=0.07;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;}
   for(let b of bgB){ctx.fillStyle=theme.buildColor;ctx.fillRect(b.x,GROUND-b.h,b.w,b.h);ctx.strokeStyle=theme.buildStroke;ctx.lineWidth=1;ctx.strokeRect(b.x,GROUND-b.h,b.w,b.h);}
   for(let b of fgB){
     ctx.fillStyle=C.white;ctx.strokeStyle='#CCC';ctx.lineWidth=1.8;
     ctx.fillRect(b.x,GROUND-b.h,b.w,b.h);ctx.strokeRect(b.x,GROUND-b.h,b.w,b.h);
-    if(b.win)for(let r=0;r<4;r++)for(let c=0;c<3;c++){ctx.fillStyle='#EEE';ctx.fillRect(b.x+9+c*(b.w/3-2),GROUND-b.h+14+r*26,b.w/3-9,16);}
+    if(b.win&&!IS_MOBILE)for(let r=0;r<4;r++)for(let c=0;c<3;c++){ctx.fillStyle='#EEE';ctx.fillRect(b.x+9+c*(b.w/3-2),GROUND-b.h+14+r*26,b.w/3-9,16);}
   }
 
   for(let b of billboards){
