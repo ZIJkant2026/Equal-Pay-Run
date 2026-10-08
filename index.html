@@ -74,9 +74,11 @@ const THEMES=[
   {id:'gezin',   label:'Gezin',   bgColor:'#FFF5E6',groundColor:'#7A3B10',markColor:'#C8804A',buildColor:'#FFE4C4',buildStroke:'#C8804A',accentColor:'#7A3B10'},
   {id:'cultuur', label:'Cultuur', bgColor:'#F3E8F5',groundColor:'#5B2A6B',markColor:'#A865C0',buildColor:'#E8D5F0',buildStroke:'#A865C0',accentColor:'#5B2A6B'},
 ];
+// Lengte van één level in pixels (origineel 10500 ≈ 40 s; 6300 ≈ 25 s). Pas dit getal aan om alle levels korter/langer te maken.
+const LEVEL_LENGTH=6300;
 const TRANSITIONS=[
-  {px:10500,toTheme:1,label:'Gezin',color:'#7A3B10'},
-  {px:21000,toTheme:2,label:'Cultuur',color:'#5B2A6B'},
+  {px:LEVEL_LENGTH,toTheme:1,label:'Gezin',color:'#7A3B10'},
+  {px:LEVEL_LENGTH*2,toTheme:2,label:'Cultuur',color:'#5B2A6B'},
 ];
 
 const MSGS=[
@@ -936,7 +938,7 @@ function startGame(){
   screen.style.display='none';gameState='playing';frame=0;speed=SPEED_START;lives=5;won=false;
   clockAngle=0;clockShake=0;clockTick=0;msgIndex=0;
   av.x=160;av.y=GROUND;av.vy=0;av.jumping=false;av.ducking=false;av.hit=false;av.hitTimer=0;av.legPhase=0;av.downed=false;
-  prisonX=VW+30000;prisonVisible=false;
+  prisonX=LEVEL_LENGTH*3+178; // finish aan het einde van level 3prisonVisible=false;
   rechargeTimer=0;rechargeFactTitle='';rechargeFactText='';invulnTimer=0;lastObsId=null;
   initBg();
   startMusic();
@@ -983,7 +985,8 @@ function update(){
   frame++;
   distancePx+=speed;
   // Speed ramp: based on distance, not frames — same at any FPS
-  if(distancePx>10800)speed=Math.min(SPEED_MAX,SPEED_START+(distancePx-10800)/180000*(SPEED_MAX-SPEED_START));
+  const RAMP_START=LEVEL_LENGTH*1.03, RAMP_LEN=180000*LEVEL_LENGTH/10500;
+  if(distancePx>RAMP_START)speed=Math.min(SPEED_MAX,SPEED_START+(distancePx-RAMP_START)/RAMP_LEN*(SPEED_MAX-SPEED_START));
   av.legPhase+=av.jumping?0.09:0.24;
   if(av.jumping||av.y<GROUND){av.vy+=GRAVITY;av.y+=av.vy;if(av.y>=GROUND){av.y=GROUND;av.jumping=false;av.vy=0;}}
   if(invulnTimer>0)invulnTimer-=TARGET_DT;
