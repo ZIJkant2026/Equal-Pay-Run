@@ -20,6 +20,15 @@ canvas{display:block;touch-action:none;-webkit-tap-highlight-color:transparent;w
 #wrap.compact .btn{padding:12px 28px;font-size:0.9rem;min-height:44px}
 #wrap.compact #endTitle{font-size:1.1rem}
 #wrap.compact #endSub{font-size:0.85rem}
+/* Keuze staand/liggend: alleen op een gsm */
+.orient-btns{display:none;gap:0.6rem;flex-wrap:wrap;justify-content:center}
+.orient-btns .btn{margin-top:0.6rem}
+.orient-hint{display:none;font-size:0.8rem;color:#333;margin-top:0.5rem;max-width:420px;line-height:1.4}
+.orient-switch{display:none}
+#wrap.mob .orient-btns{display:flex}
+#wrap.mob .orient-hint{display:block}
+#wrap.mob .orient-switch{display:inline-block}
+#wrap.mob #startBtn{display:none}
 #screen h1{font-size:clamp(2rem,5vw,4rem);font-weight:900;color:#1A1A1A;text-transform:uppercase;letter-spacing:-2px;line-height:1;margin-bottom:0.75rem}
 #screen .sub{font-size:clamp(0.85rem,1.8vw,1.05rem);color:#333;max-width:520px;line-height:1.7;margin-bottom:1.75rem}
 #screen .sub strong{color:#CC0000}
@@ -45,6 +54,11 @@ canvas{display:block;touch-action:none;-webkit-tap-highlight-color:transparent;w
       <strong>Gsm: tik boven = springen · tik onder = bukken · of swipe omhoog/omlaag</strong>
     </p>
     <button class="btn" id="startBtn">Start het spel</button>
+    <div class="orient-btns">
+      <button class="btn" id="startLand">Speel liggend</button>
+      <button class="btn sec" id="startPort">Speel staand</button>
+    </div>
+    <p class="orient-hint">Liggend geeft een groter beeld: kantel je gsm na het starten.</p>
   </div>
   <canvas id="c"></canvas>
 </div>
@@ -52,7 +66,9 @@ canvas{display:block;touch-action:none;-webkit-tap-highlight-color:transparent;w
 const canvas=document.getElementById('c');
 const ctx=canvas.getContext('2d');
 const screen=document.getElementById('screen');
-document.getElementById('startBtn').addEventListener('click',startGame);
+document.getElementById('startBtn').addEventListener('click',()=>{goFullscreenLandscape();startGame();});
+document.getElementById('startLand').addEventListener('click',()=>{setOrient('liggend');startGame();});
+document.getElementById('startPort').addEventListener('click',()=>{setOrient('staand');startGame();});
 
 const VW=1200,VH=500;
 // Max. breedte van het interne beeld in pixels. Hoger = scherper op grote schermen, maar zwaarder voor de computer.
@@ -64,9 +80,26 @@ const wrapEl=document.getElementById('wrap');
 const IS_TOUCH=('ontouchstart' in window)||navigator.maxTouchPoints>0;
 // Huidige schermindeling: rot = spel 90° gedraaid getoond (gsm rechtop), effW/effH = breedte/hoogte vanuit het spel gezien
 const LAYOUT={rot:false,effW:0,effH:0,cssW:0,cssH:0};
+// Keuze van de speler op gsm: 'liggend' of 'staand' (wordt onthouden)
+let ORIENT=null;
+try{ORIENT=localStorage.getItem('epr_orient');}catch(e){}
+function setOrient(o){
+  ORIENT=o;
+  try{localStorage.setItem('epr_orient',o);}catch(e){}
+  if(o==='liggend'){goFullscreenLandscape();}
+  else{
+    // Terug naar staand: liggend-vergrendeling en volledig scherm (Android) opheffen
+    try{const so=window.screen.orientation;if(so&&so.unlock)so.unlock();}catch(e){}
+    try{if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{});
+        else if(document.webkitFullscreenElement&&document.webkitExitFullscreen)document.webkitExitFullscreen();}catch(e){}
+  }
+  resize(true);resizeSoon();
+}
 function resize(redraw){
   const vw=window.innerWidth,vh=window.innerHeight;
-  const rot=IS_TOUCH&&vh>vw;
+  // Gedraaid tonen alleen als de speler "liggend" koos en de gsm rechtop staat
+  const rot=IS_TOUCH&&vh>vw&&ORIENT==='liggend';
+  wrapEl.classList.toggle('mob',IS_TOUCH&&Math.min(vw,vh)<700);
   LAYOUT.rot=rot;
   if(rot){
     wrapEl.classList.add('rot');
@@ -1223,7 +1256,6 @@ function playVictoryMusic(){
 }
 
 function startGame(){
-  goFullscreenLandscape();
   screen.style.display='none';gameState='playing';frame=0;speed=SPEED_START;lives=5;won=false;
   clockAngle=0;clockShake=0;clockTick=0;msgIndex=0;
   av.x=160;av.y=GROUND;av.vy=0;av.jumping=false;av.ducking=false;av.hit=false;av.hitTimer=0;av.legPhase=0;av.downed=false;
@@ -1794,7 +1826,12 @@ function showEnd(){
   });
   const reB=document.createElement('button');reB.className='btn sec';reB.textContent='Opnieuw spelen';
   reB.addEventListener('click',startGame);
-  screen.appendChild(t);screen.appendChild(s);screen.appendChild(shareB);screen.appendChild(c);screen.appendChild(reB);
+  // Op gsm: wisselen tussen staand en liggend spelen
+  const swB=document.createElement('button');swB.className='btn sec orient-switch';
+  const swLabel=()=>{swB.textContent=ORIENT==='liggend'?'Wissel naar staand':'Wissel naar liggend';};
+  swLabel();
+  swB.addEventListener('click',()=>{setOrient(ORIENT==='liggend'?'staand':'liggend');swLabel();});
+  screen.appendChild(t);screen.appendChild(s);screen.appendChild(shareB);screen.appendChild(c);screen.appendChild(reB);screen.appendChild(swB);
 }
 draw();
 </script>
