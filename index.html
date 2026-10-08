@@ -576,6 +576,42 @@ const OBS_DEFS=[
      obsLabel('Discriminatie',w/2,-6);
    }},
 
+  // Seksisme op de werkvloer: koffieautomaat met 'HAHA!' (grappen aan de koffiemachine) — jump
+  {id:'seksisme',label:'Seksisme op de werkvloer',action:'jump',theme:'cultuur',
+   w:84,h:92,
+   desc:'87% van de vrouwen werd op het werk al slachtoffer van seksistisch gedrag, zoals ongepaste grappen of opmerkingen (JUMP, 2025). Seksisme tast hun welzijn en zelfvertrouwen aan, en daarmee ook hun loopbaankansen.',
+   draw(w,h){
+     const mx=8,mw=50,mt=h-80;
+     // Machine
+     ctx.fillStyle='#455A64';ctx.beginPath();ctx.roundRect(mx,mt,mw,80,5);ctx.fill();
+     ctx.strokeStyle='#263238';ctx.lineWidth=2;ctx.stroke();
+     // Schermpje
+     ctx.fillStyle='#B2EBF2';ctx.fillRect(mx+8,mt+8,mw-16,14);
+     ctx.fillStyle='#006064';ctx.font='bold 8px Space Grotesk,sans-serif';ctx.textAlign='center';
+     ctx.fillText('KOFFIE',mx+mw/2,mt+18);
+     // Knopjes
+     ctx.fillStyle=C.red;
+     for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(mx+14+i*11,mt+31,3.5,0,Math.PI*2);ctx.fill();}
+     // Uitgifte-opening met bekertje
+     ctx.fillStyle='#1C262B';ctx.fillRect(mx+10,mt+42,mw-20,30);
+     ctx.fillStyle='#FFFFFF';ctx.beginPath();
+     ctx.moveTo(mx+mw/2-8,mt+56);ctx.lineTo(mx+mw/2+8,mt+56);ctx.lineTo(mx+mw/2+6,mt+72);ctx.lineTo(mx+mw/2-6,mt+72);ctx.closePath();ctx.fill();
+     ctx.fillStyle='#6D4C41';ctx.fillRect(mx+mw/2-7,mt+58,14,3);
+     // Stoomwolkje
+     ctx.strokeStyle='rgba(255,255,255,0.8)';ctx.lineWidth=1.5;
+     ctx.beginPath();ctx.moveTo(mx+mw/2,mt+54);ctx.bezierCurveTo(mx+mw/2-4,mt+50,mx+mw/2+4,mt+48,mx+mw/2,mt+44);ctx.stroke();
+     // 'HAHA!'-ballon rechtsboven
+     const bx=w-2,by=mt+6;
+     ctx.fillStyle='#FFEB3B';ctx.strokeStyle='#F57F17';ctx.lineWidth=2;
+     ctx.beginPath();
+     for(let k=0;k<16;k++){const a=k/16*Math.PI*2,r=k%2?17:23;ctx.lineTo(bx-6+Math.cos(a)*r,by+Math.sin(a)*r*0.75);}
+     ctx.closePath();ctx.fill();ctx.stroke();
+     ctx.fillStyle=C.red;ctx.font='bold 9px Space Grotesk,sans-serif';
+     ctx.fillText('HAHA!',bx-6,by+3);
+     ctx.textAlign='left';
+     obsLabel('Seksisme',w/2,-8);
+   }},
+
   // Microagressie — duck
   {id:'microagressie',label:'Microagressie',action:'duck',theme:'cultuur',
    w:230,h:0,
