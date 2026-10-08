@@ -473,6 +473,45 @@ const OBS_DEFS=[
      ctx.textAlign='left';
    }},
 
+  // Mantelzorg: oudere persoon in rolstoel met hartje — jump
+  {id:'mantelzorg',label:'Mantelzorg',action:'jump',theme:'gezin',
+   w:84,h:88,
+   desc:'Vrouwen zorgen vaker voor een ziek, ouder of hulpbehoevend familielid. Om die mantelzorg te combineren met hun job werken ze vaker deeltijds of onderbreken ze hun loopbaan. Dat kost loon en later ook pensioen.',
+   draw(w,h){
+     const g=h-2; // grondlijn
+     // Grote achterwiel
+     ctx.strokeStyle='#37474F';ctx.lineWidth=4;
+     ctx.beginPath();ctx.arc(34,g-22,22,0,Math.PI*2);ctx.stroke();
+     ctx.lineWidth=1.5;
+     for(let a=0;a<Math.PI;a+=Math.PI/4){ctx.beginPath();ctx.moveTo(34+Math.cos(a)*20,g-22+Math.sin(a)*20);ctx.lineTo(34-Math.cos(a)*20,g-22-Math.sin(a)*20);ctx.stroke();}
+     // Klein voorwiel
+     ctx.fillStyle='#37474F';ctx.beginPath();ctx.arc(66,g-6,6,0,Math.PI*2);ctx.fill();
+     // Frame: zitting, rugleuning, duwhandvat, voetsteun
+     ctx.strokeStyle='#546E7A';ctx.lineWidth=4;ctx.lineCap='round';
+     ctx.beginPath();ctx.moveTo(22,g-36);ctx.lineTo(60,g-36);ctx.lineTo(66,g-10);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(22,g-36);ctx.lineTo(16,g-70);ctx.lineTo(6,g-70);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(66,g-14);ctx.lineTo(76,g-14);ctx.stroke();
+     // Persoon: benen, lichaam, armen, hoofd met grijs haar
+     ctx.strokeStyle='#5C6BC0';ctx.lineWidth=7;
+     ctx.beginPath();ctx.moveTo(30,g-40);ctx.lineTo(56,g-40);ctx.lineTo(62,g-18);ctx.stroke();
+     ctx.fillStyle='#7986CB';
+     ctx.beginPath();ctx.roundRect(20,g-66,18,30,6);ctx.fill();
+     ctx.strokeStyle='#7986CB';ctx.lineWidth=5;
+     ctx.beginPath();ctx.moveTo(34,g-58);ctx.lineTo(46,g-46);ctx.stroke();
+     ctx.lineCap='butt';
+     ctx.fillStyle='#FFCC80';ctx.beginPath();ctx.arc(30,g-74,9,0,Math.PI*2);ctx.fill();
+     ctx.fillStyle='#BDBDBD';ctx.beginPath();ctx.arc(30,g-77,9,Math.PI,0);ctx.fill();
+     ctx.beginPath();ctx.arc(22,g-74,3.5,0,Math.PI*2);ctx.fill();
+     // Rood hartje: zorg
+     const hx=58,hy=g-70;
+     ctx.fillStyle=C.red;ctx.beginPath();
+     ctx.moveTo(hx,hy+6);
+     ctx.bezierCurveTo(hx-12,hy-2,hx-6,hy-12,hx,hy-5);
+     ctx.bezierCurveTo(hx+6,hy-12,hx+12,hy-2,hx,hy+6);
+     ctx.fill();
+     obsLabel('Mantelzorg',w/2,-6);
+   }},
+
 
 
   // ── CULTUUR ───────────────────────────────────────────────────────────────
