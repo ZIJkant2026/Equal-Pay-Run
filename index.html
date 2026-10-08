@@ -783,18 +783,23 @@ function initBg(){
   distancePx=0;currentThemeIdx=0;transitionBanner=null;
 }
 
-// avoid spawning the same obstacle twice in a row for better variety
-let lastObsId=null;
+// "Geschud stapeltje" per level: elk obstakel van het level komt één keer aan de beurt
+// (in willekeurige volgorde) voordat er eentje herhaald wordt. Nooit twee keer hetzelfde na elkaar.
+let lastObsId=null, obsBag=[], obsBagTheme=null;
+function refillObsBag(themeId){
+  const pool=OBS_DEFS.filter(d=>d.theme===themeId);
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+  // Vermijd dat het nieuwe stapeltje begint met het obstakel dat net voorbij kwam
+  if(pool.length>1&&pool[pool.length-1].id===lastObsId){const k=Math.floor(Math.random()*(pool.length-1));[pool[k],pool[pool.length-1]]=[pool[pool.length-1],pool[k]];}
+  obsBag=pool; obsBagTheme=themeId;
+}
 function trySpawnObstacle(){
   const rightmost=obstacles.length?Math.max(...obstacles.map(o=>o.x+o.w)):0;
   if(rightmost>VW-MIN_OBS_GAP)return;
   const theme=getTheme();
-  let pool=OBS_DEFS.filter(d=>d.theme===theme.id);
-  if(pool.length>1 && lastObsId){
-    const filtered=pool.filter(d=>d.id!==lastObsId);
-    if(filtered.length) pool=filtered;
-  }
-  const def=pool[Math.floor(Math.random()*pool.length)];
+  if(obsBagTheme!==theme.id){lastObsId=null;refillObsBag(theme.id);}
+  if(!obsBag.length)refillObsBag(theme.id);
+  const def=obsBag.pop();
   lastObsId=def.id;
   const obsH=def.action==='jump'?def.h:GROUND-HUD_H-AV_H_DUCK-22;
   obstacles.push({
@@ -1093,7 +1098,7 @@ function startGame(){
   clockAngle=0;clockShake=0;clockTick=0;msgIndex=0;
   av.x=160;av.y=GROUND;av.vy=0;av.jumping=false;av.ducking=false;av.hit=false;av.hitTimer=0;av.legPhase=0;av.downed=false;
   prisonX=LEVEL_LENGTH*3+178; // finish aan het einde van level 3prisonVisible=false;
-  rechargeTimer=0;rechargeFactTitle='';rechargeFactText='';invulnTimer=0;lastObsId=null;
+  rechargeTimer=0;rechargeFactTitle='';rechargeFactText='';invulnTimer=0;lastObsId=null;obsBag=[];obsBagTheme=null;
   initBg();
   startMusic();
   if(!running)startLoop();
