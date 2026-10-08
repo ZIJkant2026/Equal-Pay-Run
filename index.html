@@ -10,7 +10,16 @@
 html,body{width:100%;height:100%;overflow:hidden;background:#1A1A1A;font-family:'Space Grotesk',sans-serif;user-select:none;touch-action:none;-webkit-overflow-scrolling:none}
 #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#1A1A1A}
 canvas{display:block;touch-action:none;-webkit-tap-highlight-color:transparent;will-change:transform}
-#screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;z-index:10;padding:2rem;text-align:center}
+/* Gsm rechtop: het hele spel wordt 90° gedraaid getoond, zodat je de gsm gewoon kantelt (werkt ook met draaivergrendeling aan) */
+#wrap.rot{inset:auto;top:0;left:0;transform-origin:0 0}
+#screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:safe center;background:#fff;z-index:10;padding:2rem;text-align:center;overflow-y:auto;touch-action:pan-y}
+#wrap.compact #screen{padding:0.8rem 1.2rem}
+#wrap.compact #screen h1{font-size:2rem;margin-bottom:0.4rem}
+#wrap.compact #screen .sub{font-size:0.8rem;line-height:1.4;margin-bottom:0.6rem;max-width:640px}
+#wrap.compact #screen .sub br+br{display:none}
+#wrap.compact .btn{padding:12px 28px;font-size:0.9rem;min-height:44px}
+#wrap.compact #endTitle{font-size:1.1rem}
+#wrap.compact #endSub{font-size:0.85rem}
 #screen h1{font-size:clamp(2rem,5vw,4rem);font-weight:900;color:#1A1A1A;text-transform:uppercase;letter-spacing:-2px;line-height:1;margin-bottom:0.75rem}
 #screen .sub{font-size:clamp(0.85rem,1.8vw,1.05rem);color:#333;max-width:520px;line-height:1.7;margin-bottom:1.75rem}
 #screen .sub strong{color:#CC0000}
@@ -51,9 +60,28 @@ const MAX_RENDER_W=3200;
 
 // Het canvas tekent op de echte schermgrootte (× pixeldichtheid), niet op vaste 1200×500
 // die daarna wordt uitgerekt. Zo blijft tekst ook op grote schermen scherp.
+const wrapEl=document.getElementById('wrap');
+const IS_TOUCH=('ontouchstart' in window)||navigator.maxTouchPoints>0;
+// Huidige schermindeling: rot = spel 90° gedraaid getoond (gsm rechtop), effW/effH = breedte/hoogte vanuit het spel gezien
+const LAYOUT={rot:false,effW:0,effH:0,cssW:0,cssH:0};
 function resize(redraw){
-  const sx=window.innerWidth/VW,sy=window.innerHeight/VH,sc=Math.min(sx,sy);
+  const vw=window.innerWidth,vh=window.innerHeight;
+  const rot=IS_TOUCH&&vh>vw;
+  LAYOUT.rot=rot;
+  if(rot){
+    wrapEl.classList.add('rot');
+    wrapEl.style.width=vh+'px'; wrapEl.style.height=vw+'px';
+    wrapEl.style.transform='translateX('+vw+'px) rotate(90deg)';
+  } else {
+    wrapEl.classList.remove('rot');
+    wrapEl.style.width=''; wrapEl.style.height=''; wrapEl.style.transform='';
+  }
+  const effW=rot?vh:vw, effH=rot?vw:vh;
+  LAYOUT.effW=effW; LAYOUT.effH=effH;
+  wrapEl.classList.toggle('compact',effH<600);
+  const sx=effW/VW,sy=effH/VH,sc=Math.min(sx,sy);
   const cssW=Math.round(VW*sc),cssH=Math.round(VH*sc);
+  LAYOUT.cssW=cssW; LAYOUT.cssH=cssH;
   canvas.style.width=cssW+'px'; canvas.style.height=cssH+'px';
   // Cap DPR at 2 — phones with DPR 3 draw 9× the pixels for no visible gain
   const dpr=Math.min(window.devicePixelRatio||1,2);
@@ -65,7 +93,30 @@ function resize(redraw){
 }
 resize(false);
 window.addEventListener('resize',()=>resize(true));
-window.addEventListener('orientationchange',()=>setTimeout(()=>resize(true),200));
+// Sommige toestellen (vooral iPhone) geven de nieuwe schermmaat pas wat later door: een paar keer opnieuw meten
+function resizeSoon(){[60,250,600].forEach(ms=>setTimeout(()=>resize(true),ms));}
+window.addEventListener('orientationchange',resizeSoon);
+if(window.visualViewport)window.visualViewport.addEventListener('resize',()=>resize(true));
+try{if(window.screen.orientation)window.screen.orientation.addEventListener('change',resizeSoon);}catch(e){}
+
+// Op Android: bij start volledig scherm + liggend vastzetten (iPhone ondersteunt dit niet; daar zorgt de gedraaide weergave voor)
+function goFullscreenLandscape(){
+  if(!IS_TOUCH)return;
+  const el=document.documentElement;
+  const req=el.requestFullscreen||el.webkitRequestFullscreen;
+  if(!req||document.fullscreenElement||document.webkitFullscreenElement)return;
+  try{
+    const p=req.call(el,{navigationUI:'hide'});
+    const lock=()=>{try{const o=window.screen.orientation;if(o&&o.lock)o.lock('landscape').catch(()=>{});}catch(e){}resizeSoon();};
+    if(p&&p.then)p.then(lock).catch(()=>{});else lock();
+  }catch(e){}
+}
+
+// Zet een aanraakpunt om naar coördinaten zoals het spel ze ziet (ook als het spel gedraaid getoond wordt)
+function touchPt(t){
+  if(LAYOUT.rot)return{x:t.clientY,y:window.innerWidth-t.clientX};
+  return{x:t.clientX,y:t.clientY};
+}
 
 const C={white:'#FFFFFF',red:'#CC0000',black:'#1A1A1A'};
 const IS_MOBILE='ontouchstart' in window;
@@ -902,16 +953,20 @@ document.addEventListener('touchstart',e=>{
   if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
   // Don't hijack touches on buttons/links (start, replay, share) — let them click normally
   if(e.target.closest('button,a')){_tMoved=true;return;}
+  // Start-/eindscherm: laat scrollen toe als de tekst niet op het scherm past
+  if(screen.style.display!=='none'&&e.target.closest('#screen')){_tMoved=true;return;}
   e.preventDefault();
-  const t=e.touches[0];
-  _tx=t.clientX; _ty=t.clientY; _tMoved=false;
+  const t=touchPt(e.touches[0]);
+  _tx=t.x; _ty=t.y; _tMoved=false;
 },{passive:false});
 document.addEventListener('touchmove',e=>{
   if(e.target.closest('button,a'))return;
+  if(screen.style.display!=='none'&&e.target.closest('#screen'))return;
   e.preventDefault();
   if(e.touches.length===0)return;
-  const dx=e.touches[0].clientX-_tx;
-  const dy=_ty-e.touches[0].clientY; // positive = swipe up
+  const p=touchPt(e.touches[0]);
+  const dx=p.x-_tx;
+  const dy=_ty-p.y; // positive = swipe up
   if(Math.abs(dy)>SWIPE_THRESHOLD&&!_tMoved){
     _tMoved=true;
     if(dy>0){jump();}
@@ -925,6 +980,7 @@ document.addEventListener('touchmove',e=>{
 },{passive:false});
 document.addEventListener('touchend',e=>{
   if(e.target.closest('button,a'))return;
+  if(screen.style.display!=='none'&&e.target.closest('#screen'))return;
   e.preventDefault();
   if(_duckActive){
     _duckActive=false;
@@ -935,7 +991,8 @@ document.addEventListener('touchend',e=>{
   }
   if(_tMoved)return; // already handled in touchmove (swipe jump)
   // No clear swipe registered — decide by net vertical movement first, then fall back to tap position
-  const dyFinal=_ty-e.changedTouches[0].clientY; // positive = moved up
+  const pEnd=touchPt(e.changedTouches[0]);
+  const dyFinal=_ty-pEnd.y; // positive = moved up
   if(Math.abs(dyFinal)>6){
     if(dyFinal>0){jump();}
     else{
@@ -946,8 +1003,9 @@ document.addEventListener('touchend',e=>{
     return;
   }
   // True tap (negligible movement): split screen top=jump, bottom=duck
-  const rect=canvas.getBoundingClientRect();
-  const relY=(e.changedTouches[0].clientY-rect.top)/rect.height;
+  let relY;
+  if(LAYOUT.rot){relY=(pEnd.y-(LAYOUT.effH-LAYOUT.cssH)/2)/LAYOUT.cssH;}
+  else{const rect=canvas.getBoundingClientRect();relY=(pEnd.y-rect.top)/rect.height;}
   if(relY<0.55){jump();}
   else{
     if(_duckTimer)clearTimeout(_duckTimer);
@@ -1165,6 +1223,7 @@ function playVictoryMusic(){
 }
 
 function startGame(){
+  goFullscreenLandscape();
   screen.style.display='none';gameState='playing';frame=0;speed=SPEED_START;lives=5;won=false;
   clockAngle=0;clockShake=0;clockTick=0;msgIndex=0;
   av.x=160;av.y=GROUND;av.vy=0;av.jumping=false;av.ducking=false;av.hit=false;av.hitTimer=0;av.legPhase=0;av.downed=false;
