@@ -339,6 +339,80 @@ const OBS_DEFS=[
 
 
 
+  // Onderhandelen over loon: bureau met loonvoorstel '€ ?' en een NEE-stempel — jump
+  {id:'onderhandelen',label:'Onderhandelen over loon',action:'jump',theme:'carriere',
+   w:92,h:84,
+   desc:'Vrouwen worden onderschat en minder serieus genomen als ze onderhandelen over hun loon. Mannen krijgen structureel meer individuele loonsverhogingen: binnen tien jaar krijgen twee op de drie mannen er een, tegenover één op de drie vrouwen (Attentia).',
+   draw(w,h){
+     // Bureau
+     ctx.fillStyle='#8D6E63';ctx.fillRect(2,h-44,w-4,8);
+     ctx.strokeStyle='#4E342E';ctx.lineWidth=2;ctx.strokeRect(2,h-44,w-4,8);
+     ctx.fillStyle='#6D4C41';ctx.fillRect(8,h-36,8,36);ctx.fillRect(w-16,h-36,8,36);
+     // Loonvoorstel (blad papier)
+     ctx.save();ctx.translate(w/2-16,h-64);ctx.rotate(-0.08);
+     ctx.fillStyle='#FFFFFF';ctx.fillRect(-26,-22,46,40);
+     ctx.strokeStyle='#90A4AE';ctx.lineWidth=1.5;ctx.strokeRect(-26,-22,46,40);
+     ctx.fillStyle='#1A1A1A';ctx.font='bold 9px Space Grotesk,sans-serif';ctx.textAlign='center';
+     ctx.fillText('LOON',-3,-10);
+     ctx.fillStyle='#2E7D32';ctx.font='bold 15px Space Grotesk,sans-serif';
+     ctx.fillText('€ ?',-3,8);
+     ctx.restore();
+     // Rode NEE-stempel schuin over het blad
+     ctx.save();ctx.translate(w/2+24,h-54);ctx.rotate(-0.35);
+     ctx.strokeStyle=C.red;ctx.lineWidth=2.5;ctx.strokeRect(-20,-9,40,18);
+     ctx.fillStyle=C.red;ctx.font='bold 12px Space Grotesk,sans-serif';ctx.textAlign='center';
+     ctx.fillText('NEE',0,5);
+     ctx.restore();
+     // Pen
+     ctx.strokeStyle='#1565C0';ctx.lineWidth=3;ctx.lineCap='round';
+     ctx.beginPath();ctx.moveTo(w-30,h-47);ctx.lineTo(w-10,h-49);ctx.stroke();ctx.lineCap='butt';
+     ctx.textAlign='left';
+     obsLabel('Onderhandelen',w/2,-8);
+   }},
+
+  // Extralegale voordelen: slinger met bedrijfswagen, gsm, laptop en bonus — duck
+  {id:'extralegaal',label:'Extralegale voordelen',action:'duck',theme:'carriere',
+   w:220,h:0,
+   desc:'Bedrijfswagens, bonussen, aandelenopties en een aanvullend pensioen: mannen krijgen vaker en meer extralegale voordelen dan vrouwen. Daardoor is de loonkloof in werkelijkheid nog groter dan het brutoloon alleen laat zien.',
+   draw(w,h){
+     // Slingerkoord
+     ctx.strokeStyle='#555';ctx.lineWidth=2;ctx.setLineDash([4,4]);
+     ctx.beginPath();ctx.moveTo(10,10);ctx.lineTo(10,-20);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(w-10,10);ctx.lineTo(w-10,-20);ctx.stroke();
+     ctx.setLineDash([]);
+     ctx.strokeStyle='#5D4037';ctx.lineWidth=2.5;
+     ctx.beginPath();ctx.moveTo(10,10);ctx.quadraticCurveTo(w/2,30,w-10,10);ctx.stroke();
+     const tags=[['car',36],['phone',84],['laptop',136],['bonus',186]];
+     for(const [kind,x] of tags){
+       const y=10+20*(1-Math.pow((x-w/2)/(w/2-10),2)); // op de slinger
+       // Hangkaartje
+       ctx.strokeStyle='#5D4037';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y+8);ctx.stroke();
+       ctx.fillStyle='#FFF8E1';ctx.strokeStyle='#F9A825';ctx.lineWidth=2;
+       ctx.beginPath();ctx.roundRect(x-20,y+8,40,34,6);ctx.fill();ctx.stroke();
+       const cx=x,cy=y+25;
+       if(kind==='car'){
+         ctx.fillStyle='#1565C0';
+         ctx.beginPath();ctx.roundRect(cx-14,cy-2,28,9,3);ctx.fill();
+         ctx.beginPath();ctx.moveTo(cx-8,cy-2);ctx.lineTo(cx-4,cy-9);ctx.lineTo(cx+6,cy-9);ctx.lineTo(cx+10,cy-2);ctx.closePath();ctx.fill();
+         ctx.fillStyle='#263238';ctx.beginPath();ctx.arc(cx-8,cy+8,3.5,0,Math.PI*2);ctx.arc(cx+8,cy+8,3.5,0,Math.PI*2);ctx.fill();
+       }else if(kind==='phone'){
+         ctx.fillStyle='#263238';ctx.beginPath();ctx.roundRect(cx-7,cy-12,14,24,3);ctx.fill();
+         ctx.fillStyle='#80DEEA';ctx.fillRect(cx-5,cy-9,10,16);
+       }else if(kind==='laptop'){
+         ctx.fillStyle='#455A64';ctx.fillRect(cx-12,cy-10,24,15);
+         ctx.fillStyle='#B3E5FC';ctx.fillRect(cx-10,cy-8,20,11);
+         ctx.fillStyle='#607D8B';ctx.fillRect(cx-15,cy+5,30,4);
+       }else{
+         ctx.fillStyle='#F9A825';ctx.beginPath();ctx.arc(cx,cy,11,0,Math.PI*2);ctx.fill();
+         ctx.strokeStyle='#F57F17';ctx.lineWidth=1.5;ctx.stroke();
+         ctx.fillStyle='#5D4037';ctx.font='bold 13px Space Grotesk,sans-serif';ctx.textAlign='center';
+         ctx.fillText('€',cx,cy+5);ctx.textAlign='left';
+       }
+     }
+     ctx.fillStyle='#1A1A1A';ctx.font='bold 11px Space Grotesk,sans-serif';ctx.textAlign='center';
+     ctx.fillText('Extralegale voordelen',w/2,88);ctx.textAlign='left';
+   }},
+
   // ── GEZIN ─────────────────────────────────────────────────────────────────
 
   // Moederschapsstraf: 2 toddlers — jump
