@@ -512,6 +512,39 @@ const OBS_DEFS=[
      obsLabel('Mantelzorg',w/2,-6);
    }},
 
+  // Mentale last: gedachtewolk vol to-do's boven het hoofd — duck
+  {id:'mentalelast',label:'Mentale last',action:'duck',theme:'gezin',
+   w:230,h:0,
+   desc:'Mentale last is het onzichtbare denk- en regelwerk van een gezin: afspraken onthouden, opvang regelen, boodschappen plannen. Die last ligt vaker bij vrouwen. Ook op het werk blijft die lijst door hun hoofd spoken, en dat kost energie en kansen in hun loopbaan.',
+   draw(w,h){
+     const sh=84;
+     // Ophanglijnen
+     ctx.strokeStyle='#555';ctx.lineWidth=2;ctx.setLineDash([4,4]);
+     ctx.beginPath();ctx.moveTo(24,22);ctx.lineTo(24,-6);ctx.stroke();
+     ctx.beginPath();ctx.moveTo(w-24,22);ctx.lineTo(w-24,-6);ctx.stroke();
+     ctx.setLineDash([]);
+     // Gedachtewolk (overlappende cirkels): eerst dikke rand, dan vulling erover = strakke contour
+     const bumps=[[34,40,22],[72,30,24],[115,27,26],[160,30,24],[198,40,22],[56,62,22],[100,64,24],[148,64,24],[186,58,20],[115,46,30]];
+     ctx.fillStyle='#1565C0';
+     for(const [x,y,r] of bumps){ctx.beginPath();ctx.arc(x,y,r+2,0,Math.PI*2);ctx.fill();}
+     ctx.fillStyle='#E3F2FD';
+     for(const [x,y,r] of bumps){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();}
+     // Kleine wolkjes naar beneden (richting hoofd)
+     ctx.fillStyle='#E3F2FD';ctx.strokeStyle='#1565C0';ctx.lineWidth=1.5;
+     for(const [x,y,r] of [[96,sh+6,6],[88,sh+18,4]]){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.stroke();}
+     // To-do's in de wolk
+     ctx.fillStyle='#0D47A1';ctx.font='bold 11px Space Grotesk,sans-serif';ctx.textAlign='left';
+     const todo=[['Zwemles',38,38],['Tandarts',122,36],['Brooddozen',34,60],['Cadeau oma',122,60]];
+     for(const [t,x,y] of todo){
+       ctx.strokeStyle='#0D47A1';ctx.lineWidth=1.2;ctx.strokeRect(x,y-8,8,8);
+       ctx.fillText(t,x+12,y);
+     }
+     ctx.fillStyle=C.red;ctx.font='bold 18px Space Grotesk,sans-serif';
+     ctx.fillText('!',202,44);
+     ctx.fillStyle='#1A1A1A';ctx.font='bold 11px Space Grotesk,sans-serif';ctx.textAlign='center';
+     ctx.fillText('Mentale last',w/2+30,sh+18);ctx.textAlign='left';
+   }},
+
 
 
   // ── CULTUUR ───────────────────────────────────────────────────────────────
