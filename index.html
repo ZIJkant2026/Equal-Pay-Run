@@ -254,7 +254,7 @@ const OBS_DEFS=[
   // Loontaboe: lips with shushing finger — duck
   {id:'loontaboe',label:'Loontaboe',action:'duck',theme:'carriere',
    w:120,h:0,
-   desc:'Praten over geld is moeilijk. Als je niet weet wat je collega\u2019s verdienen, is equal pay veraf.',
+   desc:'Mensen praten makkelijker over seks dan over hun loon. Maar als je niet weet wat je collega\u2019s verdienen, is equal pay veraf.',
     draw(w,h){
       const cx=w/2;
       // Suspension lines
@@ -426,7 +426,7 @@ const OBS_DEFS=[
   // Onderhandelen over loon: bureau met loonvoorstel '€ ?' en een NEE-stempel — jump
   {id:'onderhandelen',label:'Onderhandelen over loon',action:'jump',theme:'carriere',
    w:92,h:84,
-   desc:'Vrouwen worden onderschat en minder serieus genomen als ze onderhandelen over hun loon. Mannen krijgen structureel meer individuele loonsverhogingen: binnen tien jaar krijgen twee op de drie mannen er een, tegenover één op de drie vrouwen (Attentia).',
+   desc:'Vrouwen worden onderschat en minder serieus genomen als ze onderhandelen over hun loon.',
    draw(w,h){
      // Bureau
      ctx.fillStyle='#8D6E63';ctx.fillRect(2,h-44,w-4,8);
@@ -457,7 +457,7 @@ const OBS_DEFS=[
   // Extralegale voordelen: bedrijfswagen die wegrijdt (van de speler weg) — jump
   {id:'extralegaal',label:'Extralegale voordelen',action:'jump',theme:'carriere',
    w:104,h:60,
-   desc:'Bedrijfswagens, bonussen, aandelenopties en een aanvullend pensioen: mannen krijgen vaker en meer extralegale voordelen dan vrouwen. Daardoor is de loonkloof in werkelijkheid nog groter dan het brutoloon alleen laat zien.',
+   desc:'Bedrijfswagens, bonussen, aandelenopties en een aanvullend pensioen: mannen krijgen vaker en meer extralegale voordelen. Daardoor is de loonkloof in werkelijkheid nog groter.',
    draw(w,h){
      const t=Date.now()/120;
      // Snelheidslijnen en uitlaatwolkjes links (de auto rijdt naar rechts, weg van de speler)
@@ -611,7 +611,7 @@ const OBS_DEFS=[
   // Deeltijds werk signpost — jump
   {id:'parttime',label:'Deeltijds werk',action:'jump',theme:'gezin',
    w:90,h:78,
-   desc:'Bijna de helft van de vrouwen werkt deeltijds, tegenover één op de tien mannen. Dat doen ze vooral om voor kinderen of andere personen te zorgen. Ook zorgverloven worden hoofdzakelijk door vrouwen opgenomen.',
+   desc:'Bijna de helft van de vrouwen werkt deeltijds, tegenover één op de tien mannen. Dat doen ze vooral om voor kinderen of andere personen te zorgen.',
    draw(w,h){
      // Pole
      ctx.fillStyle='#8D6E63';ctx.fillRect(w/2-5,0,10,h);
@@ -631,7 +631,7 @@ const OBS_DEFS=[
   // Mantelzorg: oudere persoon in rolstoel met hartje — jump
   {id:'mantelzorg',label:'Mantelzorg',action:'jump',theme:'gezin',
    w:84,h:88,
-   desc:'Vrouwen zorgen vaker voor een ziek, ouder of hulpbehoevend familielid. Om die mantelzorg te combineren met hun job werken ze vaker deeltijds of onderbreken ze hun loopbaan. Dat kost loon en later ook pensioen.',
+   desc:'Vrouwen zorgen vaker voor een ziek, ouder of hulpbehoevend familielid. Om die mantelzorg te combineren met hun job werken ze vaker deeltijds of onderbreken ze hun loopbaan.',
    draw(w,h){
      const g=h-2; // grondlijn
      // Grote achterwiel
@@ -670,7 +670,7 @@ const OBS_DEFS=[
   // Mentale last: gedachtewolk vol to-do's boven het hoofd — duck
   {id:'mentalelast',label:'Mentale last',action:'duck',theme:'gezin',
    w:230,h:0,
-   desc:'Mentale last is het onzichtbare denk- en regelwerk van een gezin: afspraken onthouden, opvang regelen, boodschappen plannen. Die last ligt vaker bij vrouwen. Ook op het werk blijft die lijst door hun hoofd spoken, en dat kost energie en kansen in hun loopbaan.',
+   desc:'Afspraken onthouden, opvang regelen, boodschappen plannen: in veel gezinnen nemen vrouwen dit op. Hoe eerlijker de taken verdeeld worden binnen een gezin, hoe meer kans op equal pay.',
    draw(w,h){
      const sh=84;
      // Ophanglijnen
@@ -734,7 +734,7 @@ const OBS_DEFS=[
   // Seksisme op de werkvloer: koffieautomaat met 'HAHA!' (grappen aan de koffiemachine) — jump
   {id:'seksisme',label:'Seksisme op de werkvloer',action:'jump',theme:'cultuur',
    w:84,h:92,
-   desc:'87% van de vrouwen werd op het werk al slachtoffer van seksistisch gedrag, zoals ongepaste grappen of opmerkingen (JUMP, 2025). Seksisme tast hun welzijn en zelfvertrouwen aan, en daarmee ook hun loopbaankansen.',
+   desc:'87% van de vrouwen werd op het werk al slachtoffer van seksistisch gedrag, zoals ongepaste grappen of opmerkingen. Dat tast hun welzijn en zelfvertrouwen aan.',
    draw(w,h){
      const mx=8,mw=50,mt=h-80;
      // Machine
@@ -770,7 +770,7 @@ const OBS_DEFS=[
   // Microagressie — duck
   {id:'microagressie',label:'Microagressie',action:'duck',theme:'cultuur',
    w:230,h:0,
-   desc:'Microagressies zijn subtiele opmerkingen of gedragingen die mensen op basis van gender (of andere kenmerken) kleineren of uitsluiten.',
+   desc:'Micro-agressies zijn subtiele opmerkingen of gedragingen die mensen op basis van gender (of andere kenmerken) kleineren of uitsluiten.',
    draw(w,h){
      const sh=62;
      // Suspension lines
@@ -840,7 +840,7 @@ const OBS_DEFS=[
   // Imposter syndrome: hangende spiegel met vraagteken — duck
   {id:'imposter',label:'Imposter syndrome',action:'duck',theme:'cultuur',
    w:150,h:0,
-   desc:'Mannen worden als competent beschouwd tot het tegendeel bewezen is. Vrouwen worden als incompetent beschouwd tot het tegendeel bewezen is. Dit zorgt ervoor dat vrouwen twijfelen aan zichzelf en minder snel solliciteren voor hogere functies.',
+   desc:'Mannen worden als competent beschouwd tot het tegendeel bewezen is. Vrouwen worden als incompetent beschouwd tot het tegendeel bewezen is. Dit zorgt ervoor dat vrouwen twijfelen aan zichzelf.',
    draw(w,h){
      const fx=w/2-42,fy=14,fw=84,fh=66;
      // Ophangkoord
@@ -879,7 +879,7 @@ const OBS_DEFS=[
   // Gezinsonvriendelijke werkuren — jump
   {id:'workfamily_cultuur',label:'Gezinsonvriendelijke werkuren',action:'jump',theme:'cultuur',
    w:84,h:84,
-   desc:'Vergaderingen na 17 uur, avondwerk en de verwachting dat je altijd bereikbaar bent: in veel sectoren worden overuren en permanente beschikbaarheid beloond. Vrouwen kunnen daar minder aan voldoen, omdat ze het grootste deel van het huishouden en de zorg voor de kinderen opnemen.',
+   desc:'Avondvergaderingen en de klok rond mails of telefoons: veel sectoren verwachten dat hun personeel permanent beschikbaar is. Dat is voor veel vrouwen onhaalbaar, omdat ze het grootste deel van het huishouden en de zorg voor de kinderen opnemen.',
    draw(w,h){
      ctx.fillStyle='#FF8A65';
      ctx.beginPath();ctx.moveTo(2,h-46);ctx.lineTo(36,h-70);ctx.lineTo(70,h-46);ctx.closePath();ctx.fill();
@@ -1820,8 +1820,8 @@ function showEnd(){
   const shareB=document.createElement('button');shareB.className='btn';shareB.textContent='Deel dit spel';
   shareB.addEventListener('click',()=>{
     const txt=won
-      ?'Ik heb de Equal Pay Run voltooid: de enige plek met gelijke verloning voor mannen en vrouwen! Daarbuiten werken vrouwen elke dag gratis vanaf 15:24. #Loonkloof #UnequalPayDay'
-      :'Ik heb de Equal Pay Run niet gehaald en krijg dus geen gelijk loon. Vanaf 15:24 werken vrouwen gratis. #Loonkloof #UnequalPayDay';
+      ?'Ik heb de Equal Pay Run voltooid: de enige plek met gelijke verloning voor mannen en vrouwen! Wil je ook in het echte leven equal pay? Doe mee op unequalpayday.be #Loonkloof #UnequalPayDay'
+      :'Ik heb de Equal Pay Run niet gehaald en krijg dus geen gelijk loon. Strijd mee voor equal pay op unequalpayday.be #Loonkloof #UnequalPayDay';
     navigator.clipboard.writeText(txt).then(()=>{c.textContent='Gekopieerd naar klembord!';});
   });
   const reB=document.createElement('button');reB.className='btn sec';reB.textContent='Opnieuw spelen';
