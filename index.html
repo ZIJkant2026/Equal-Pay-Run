@@ -802,7 +802,7 @@ const OBS_DEFS=[
         ['"Je bent mooier','als je lacht."'],
         ['"Heb jij een','kinderwens?"']
       ];
-      const idx=Math.floor(frame/150)%phrases.length;
+      const idx=Math.floor(frame/240)%phrases.length; // 240 frames = 4 seconden per opmerking
       const lines=phrases[idx];
       ctx.fillStyle='#4A148C';ctx.font='bold 11px Space Grotesk,sans-serif';ctx.textAlign='center';
       const cy=by+bh/2;
