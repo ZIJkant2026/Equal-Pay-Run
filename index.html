@@ -46,7 +46,7 @@ canvas{display:block;touch-action:none;-webkit-tap-highlight-color:transparent;w
     <h1>Equal Pay Run</h1>
     <p class="sub"><br><br>
       Vanaf 22 oktober werken vrouwen gratis en voor niets.<br>
-      Zij worden 19% minder betaald dan mannen, wat per jaar neerkomt op 2,5 maand zonder loon.<br><br>
+      Zij worden 19 procent minder betaald dan mannen, wat per jaar neerkomt op 2,5 maand zonder loon.<br><br>
       Nochtans verdienen vrouwen en mannen ongeveer gelijk aan de start van een loopbaan.<br><br>  
       Ontwijk de obstakels die vrouwen tegenkomen tijdens hun leven.<br><br>
       Loop door 3 levels op weg naar equal pay:<br> <strong>carrière · gezin · cultuur</strong>.<br><br>
@@ -545,7 +545,7 @@ const OBS_DEFS=[
   // Zorgtaken: washing line — duck
   {id:'zorgtaken',label:'Zorgtaken',action:'duck',theme:'gezin',
    w:200,h:0,
-   desc:'Vrouwen werken 8 uur per week meer in het huishouden en zijn 1,5 uur langer bezig met de kinderen in vergelijking met mannen.',
+   desc:'Vrouwen werken 8 uur per week meer in het huishouden en zijn 1,5 uur langer bezig met de kinderen in vergelijking met mannen. Een eerlijke taakverdeling zorgt voor equal pay.',
    draw(w,h){
      const sh=50;
      ctx.strokeStyle='#8D6E63'; ctx.lineWidth=3;
@@ -590,7 +590,7 @@ const OBS_DEFS=[
   // Kinderopvang: closed daycare — jump
   {id:'kinderopvang',label:'Geen kinderopvang',action:'jump',theme:'gezin',
    w:80,h:90,
-   desc:'Geen plaats in de crèche of dure kinderopvang zorgt ervoor dat veel minder gaan werken. Bijna de helft van de vrouwen werkt deeltijds, tegenover één op de tien mannen.',
+   desc:'Geen plaats in de crèche of dure kinderopvang houdt vooral vrouwen thuis. Hoe meer kinderen, hoe minder vrouwe werken. Mannen gaan net meer werken als ze meer kinderen krijgen.',
    draw(w,h){
      ctx.fillStyle='#EF9A9A';ctx.fillRect(4,h-72,w-8,72);
      ctx.strokeStyle='#C62828';ctx.lineWidth=2.5;ctx.strokeRect(4,h-72,w-8,72);
@@ -611,7 +611,7 @@ const OBS_DEFS=[
   // Deeltijds werk signpost — jump
   {id:'parttime',label:'Deeltijds werk',action:'jump',theme:'gezin',
    w:90,h:78,
-   desc:'Vrouwen werken veel vaker dan mannen deeltijds om zorgtaken op te nemen. Dat heeft een grote impact op hun loon, maar ook op hun pensioen. De pensioenkloof bedraagt 21 procent.',
+   desc:'Bijna de helft van de vrouwen werkt deeltijds, vooral om zorgtaken op te nemen. Bij mannen werkt slecht één op de tien deeltijds, zelden om zorgtaken op te nemen. Die ongelijke verdeling zorgt niet alleen voor een loonkloof, maar ook voor een nog grotere pensioenkloof.',
    draw(w,h){
      // Pole
      ctx.fillStyle='#8D6E63';ctx.fillRect(w/2-5,0,10,h);
