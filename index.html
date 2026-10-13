@@ -590,7 +590,7 @@ const OBS_DEFS=[
   // Kinderopvang: closed daycare — jump
   {id:'kinderopvang',label:'Geen kinderopvang',action:'jump',theme:'gezin',
    w:80,h:90,
-   desc:'Geen plaats in de crèche of te dure opvang houdt vooral vrouwen thuis.',
+   desc:'Geen plaats in de crèche of dure kinderopvang zorgt ervoor dat veel minder gaan werken. Bijna de helft van de vrouwen werkt deeltijds, tegenover één op de tien mannen.',
    draw(w,h){
      ctx.fillStyle='#EF9A9A';ctx.fillRect(4,h-72,w-8,72);
      ctx.strokeStyle='#C62828';ctx.lineWidth=2.5;ctx.strokeRect(4,h-72,w-8,72);
@@ -611,7 +611,7 @@ const OBS_DEFS=[
   // Deeltijds werk signpost — jump
   {id:'parttime',label:'Deeltijds werk',action:'jump',theme:'gezin',
    w:90,h:78,
-   desc:'Bijna de helft van de vrouwen werkt deeltijds, tegenover één op de tien mannen. Dat doen ze vooral om voor kinderen of andere personen te zorgen.',
+   desc:'Vrouwen werken veel vaker dan mannen deeltijds om zorgtaken op te nemen. Dat heeft een grote impact op hun loon, maar ook op hun pensioen. De pensioenkloof bedraagt 21 procent.',
    draw(w,h){
      // Pole
      ctx.fillStyle='#8D6E63';ctx.fillRect(w/2-5,0,10,h);
