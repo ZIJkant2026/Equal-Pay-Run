@@ -984,7 +984,7 @@ const DUCK_MIN_MS=650; // guaranteed minimum duck duration for a quick swipe, ev
 const DUCK_RELEASE_BUFFER=150; // extra grace after releasing finger, so a held duck doesn't pop up mid-obstacle
 document.addEventListener('touchstart',e=>{
   // Resume AudioContext on first touch (iOS requirement)
-  if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
+  if(audioCtx&&audioCtx.state!=='running')audioCtx.resume();
   // Don't hijack touches on buttons/links (start, replay, share) — let them click normally
   if(e.target.closest('button,a')){_tMoved=true;return;}
   // Start-/eindscherm: laat scrollen toe als de tekst niet op het scherm past
@@ -1119,21 +1119,52 @@ function _nextNote(){
   return note;
 }
 
-function startMusic(){
-  if(audioCtx){
-    // iOS: context may be suspended after page load — resume it
-    if(audioCtx.state==='suspended')audioCtx.resume();
-    return;
+// ── Geluid op gsm ─────────────────────────────────────────────────────────────
+// Eén gedeelde AudioContext voor muziek, botsgeluid en fanfare. Een nieuwe context die
+// buiten een tik/klik wordt aangemaakt, blijft op gsm stil; deze wordt bij de eerste tik
+// aangemaakt en daarna nooit gesloten.
+function getAC(){
+  if(!audioCtx){
+    try{audioCtx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){return null;}
   }
-  _secIdx=0;_noteIdx=0;
+  if(audioCtx.state!=='running'){try{audioCtx.resume();}catch(e){}}
+  return audioCtx;
+}
+// iPhone: staat de stille modus aan (schakelaar opzij), dan is Web Audio standaard stil.
+// Door geluid als 'afspelen' te markeren en één keer een stil audiobestandje af te spelen,
+// klinkt de game toch, net zoals een video op een website.
+let _audioUnlocked=false;
+function unlockAudio(){
+  try{if(navigator.audioSession)navigator.audioSession.type='playback';}catch(e){}
+  getAC();
+  if(_audioUnlocked)return;
+  _audioUnlocked=true;
   try{
-    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-    musicGain=audioCtx.createGain();
-    musicGain.gain.value=0.09;
-    musicGain.connect(audioCtx.destination);
-    // iOS requires explicit resume after creation inside a user gesture
-    audioCtx.resume();
-  }catch(e){return;}
+    // 0,05 s stilte als WAV (8 kHz, 8 bit, mono)
+    const n=400,b=new Uint8Array(44+n),v=new DataView(b.buffer);
+    const str=(o,t)=>{for(let i=0;i<t.length;i++)b[o+i]=t.charCodeAt(i);};
+    str(0,'RIFF');v.setUint32(4,36+n,true);str(8,'WAVEfmt ');v.setUint32(16,16,true);
+    v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,8000,true);v.setUint32(28,8000,true);
+    v.setUint16(32,1,true);v.setUint16(34,8,true);str(36,'data');v.setUint32(40,n,true);
+    b.fill(128,44);
+    const el=document.createElement('audio');
+    el.setAttribute('x-webkit-airplay','deny');el.preload='auto';el.playsInline=true;
+    el.src=URL.createObjectURL(new Blob([b],{type:'audio/wav'}));
+    const p=el.play();if(p&&p.catch)p.catch(()=>{});
+  }catch(e){}
+}
+['touchend','click','keydown'].forEach(ev=>document.addEventListener(ev,unlockAudio,{passive:true}));
+// Terug naar de game na een oproep, melding of ander tabblad: geluid weer aanzetten
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&audioCtx&&audioCtx.state!=='running'){try{audioCtx.resume();}catch(e){}}});
+
+function startMusic(){
+  unlockAudio();
+  if(!getAC())return;
+  if(musicTimer)return; // muziek speelt al
+  _secIdx=0;_noteIdx=0;
+  musicGain=audioCtx.createGain();
+  musicGain.gain.value=0.09;
+  musicGain.connect(audioCtx.destination);
 
   const tempo=0.36;       // seconds per beat unit
   const LOOKAHEAD=0.25;   // schedule this many seconds ahead
@@ -1178,8 +1209,9 @@ function startMusic(){
     o1.stop(when+dur+0.05);o2.stop(when+dur+0.05);o3.stop(when+dur+0.05);
   }
 
+  const myGain=musicGain;
   function scheduler(){
-    if(!audioCtx)return;
+    if(!audioCtx||musicGain!==myGain)return;
     while(nextNoteTime<audioCtx.currentTime+LOOKAHEAD){
       const note=_nextNote();
       const dur=note.d*tempo;
@@ -1190,11 +1222,15 @@ function startMusic(){
   }
   scheduler();
 }
-function stopMusic(){if(musicTimer){clearTimeout(musicTimer);musicTimer=null;}if(audioCtx){try{audioCtx.close();}catch(e){}audioCtx=null;}}
+function stopMusic(){
+  if(musicTimer){clearTimeout(musicTimer);musicTimer=null;}
+  // Context niet sluiten (op gsm kan een nieuwe pas na een tik), enkel de muziek stilleggen
+  if(musicGain){try{musicGain.disconnect();}catch(e){}musicGain=null;}
+}
 
 // ── Collision bump sound ───────────────────────────────────────────────────────
 function playCollisionSound(){
-  const ac=audioCtx||(()=>{try{return new(window.AudioContext||window.webkitAudioContext)();}catch(e){return null;}})();
+  const ac=getAC();
   if(!ac)return;
   const t=ac.currentTime;
   // Short percussive thud: filtered noise burst — louder
@@ -1223,8 +1259,8 @@ function playCollisionSound(){
 
 // ── Victory fanfare ────────────────────────────────────────────────────────────
 function playVictoryMusic(){
-  let ac;
-  try{ac=new(window.AudioContext||window.webkitAudioContext)();}catch(e){return;}
+  const ac=getAC();
+  if(!ac)return;
   const masterGain=ac.createGain();masterGain.gain.value=0.14;masterGain.connect(ac.destination);
   // Triumphant C-major fanfare — rising arpeggio + melodic flourish
   const fanfare=[
@@ -1253,7 +1289,6 @@ function playVictoryMusic(){
     }
     t+=dur;
   }
-  setTimeout(()=>{try{ac.close();}catch(e){}},t*1000+600);
 }
 
 function startGame(){
