@@ -39,6 +39,8 @@ canvas{display:block;touch-action:none;-webkit-tap-highlight-color:transparent;w
 #endSub{font-size:clamp(0.8rem,1.5vw,0.95rem);color:#1A1A1A;line-height:1.6;margin-bottom:0.2rem;max-width:480px}
 #copyMsg{color:#CC0000;font-size:0.8rem;height:1rem;margin-top:0.3rem}
 </style>
+<!-- Bezoekersstatistieken via GoatCounter (zonder cookies, geen persoonsgegevens) -->
+<script data-goatcounter="https://GC_CODE.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
 <body>
 <div id="wrap">
@@ -66,6 +68,8 @@ canvas{display:block;touch-action:none;-webkit-tap-highlight-color:transparent;w
 const canvas=document.getElementById('c');
 const ctx=canvas.getContext('2d');
 const screen=document.getElementById('screen');
+// Telt een gebeurtenis in GoatCounter; doet niets als de teller (nog) niet geladen is.
+function track(path,title){try{if(window.goatcounter&&window.goatcounter.count)window.goatcounter.count({path:path,title:title||path,event:true});}catch(e){}}
 document.getElementById('startBtn').addEventListener('click',()=>{goFullscreenLandscape();startGame();});
 document.getElementById('startLand').addEventListener('click',()=>{setOrient('liggend');startGame();});
 document.getElementById('startPort').addEventListener('click',()=>{setOrient('staand');startGame();});
@@ -1298,6 +1302,7 @@ function startGame(){
   prisonX=LEVEL_LENGTH*3+178; // finish aan het einde van level 3prisonVisible=false;
   rechargeTimer=0;rechargeFactTitle='';rechargeFactText='';invulnTimer=0;lastObsId=null;obsBag=[];obsBagTheme=null;
   initBg();
+  track('spel-gestart-'+ORIENT,'Spel gestart ('+ORIENT+')');
   startMusic();
   if(!running)startLoop();
 }
@@ -1314,7 +1319,12 @@ function triggerHit(o){
   lives--;
   o.active=false;
   playCollisionSound();
-  if(lives<=0){gameState='end';won=false;showEnd();return;}
+  if(lives<=0){
+    const lvl=getTheme();
+    track('verloren-level-'+(currentThemeIdx+1)+'-'+lvl.id,'Verloren in level '+(currentThemeIdx+1)+' ('+lvl.label+')');
+    if(def)track('laatste-obstakel-'+def.id,'Laatste obstakel: '+def.label);
+    gameState='end';won=false;showEnd();return;
+  }
   // Knock down avatar and start recharge
   av.downed=true; av.ducking=false; av.jumping=false; av.vy=0; av.y=GROUND;
   av.hit=true; av.hitTimer=500;
@@ -1847,6 +1857,7 @@ function showEnd(){
   const c=document.createElement('div');c.id='copyMsg';
   const linkHTML='<a href="https://www.zijkant.be/economische-macht/unequal-pay-day/" target="_blank" rel="noopener" style="color:#CC0000;font-weight:700;text-decoration:underline;">unequalpayday.be</a>';
   if(won){
+    track('gewonnen','Gewonnen: equal pay gehaald');
     t.textContent='Proficiat, jij krijgt equal pay!';
     s.innerHTML='Dicht ook de loonkloof in het echte leven via '+linkHTML;
   } else {
@@ -1858,10 +1869,12 @@ function showEnd(){
     const txt=won
       ?'Ik heb de Equal Pay Run voltooid: de enige plek met gelijke verloning voor mannen en vrouwen! Wil je ook in het echte leven equal pay? Doe mee op unequalpayday.be #Loonkloof #UnequalPayDay'
       :'Ik heb de Equal Pay Run niet gehaald en krijg dus geen gelijk loon. Strijd mee voor equal pay op unequalpayday.be #Loonkloof #UnequalPayDay';
+    track('deel-knop','Klik op "Deel dit spel"');
     navigator.clipboard.writeText(txt).then(()=>{c.textContent='Gekopieerd naar klembord!';});
   });
   const reB=document.createElement('button');reB.className='btn sec';reB.textContent='Opnieuw spelen';
-  reB.addEventListener('click',startGame);
+  reB.addEventListener('click',()=>{track('opnieuw-spelen','Klik op "Opnieuw spelen"');startGame();});
+  const ln=s.querySelector('a');if(ln)ln.addEventListener('click',()=>track('klik-unequalpayday','Klik naar unequalpayday.be'));
   // Op gsm: wisselen tussen staand en liggend spelen
   const swB=document.createElement('button');swB.className='btn sec orient-switch';
   const swLabel=()=>{swB.textContent=ORIENT==='liggend'?'Wissel naar staand':'Wissel naar liggend';};
